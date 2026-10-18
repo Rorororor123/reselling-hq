@@ -1,0 +1,10 @@
+Reselling Tracker - Inventory
+Item ID,Item Name,Category,Size/Details,Cost (£),Status,Date Bought,Date Listed,Platform Sold On,Date Sold,Sale Price (£),Platform Fees (£),Postage (£)
+EX-1,Example: Nike Dunk Low,Shoes,UK 9,£50.00,Sold,01/01/2026,02/01/2026,eBay,10/01/2026,£90.00,£10.00,£4.00
+S1,Jordan 4 Military Black,Shoes,UK 9,£60.00,Sold,01/09/2026,02/09/2026,eBay,15/10/2026,£100.00,£13.00,£4.00
+C1,"Carhartt Detroit jacket, brown",Clothing,L,£10.00,Sold,01/04/2026,10/04/2026,Vinted,01/05/2026,£25.00,,
+S2,Yeezy 350 Zebra,Shoes,UK 8,"£100.00",Sold,01/01/2026,05/01/2026,StockX,01/03/2026,£90.00,£9.00,
+P1,Prismatic Evolutions ETB,Pokémon TCG,Sealed,£40.00,Listed,25/07/2026,01/08/2026,,,,,
+S3,New Balance 550,Shoes,UK 10,£50.00,Listed,20/08/2026,01/09/2026,,,,,
+P2,Paldean Fates booster bundle,Pokémon TCG,Sealed,£40.00,Listed,20/05/2026,01/06/2026,,,,,
+C2,Stone Island overshirt,Clothing,M,,In stock,10/10/2026,,,,,,

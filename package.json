@@ -3,5 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "description": "Reselling HQ: weekly check, listing writer and buyer replies for a reselling business",
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "TZ=Europe/London vitest run",
+    "test:browser": "playwright test",
+    "test:all": "TZ=Europe/London vitest run && playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "vitest": "3.2.4"
+  }
 }

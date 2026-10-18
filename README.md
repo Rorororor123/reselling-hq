@@ -68,9 +68,23 @@ Enter your password and sheet links once on each device you use. Report history 
 
 Edit or replace a file on GitHub (open the file, click the pencil, then **Commit changes**). Vercel updates the live app automatically within a minute.
 
+## Supabase (database, from Stage 2)
+
+The app is being connected to Supabase (London region) ready for user accounts in Stage 3. For now it only checks the connection. Add these in Vercel, **Settings, Environment Variables**, ticked for **Preview** only:
+
+- `SUPABASE_URL`: your project's URL (Supabase, Project Settings, Data API)
+- `SUPABASE_PUBLISHABLE_KEY`: the publishable key, starts `sb_publishable_` (Supabase, Project Settings, API Keys)
+
+Then open `your-preview-link/api/health`. It shows `"supabase":"ok"` when everything's connected, or says what's missing. It never shows your keys.
+
 ## Files
 
-- `index.html`: the app
+- `index.html`: the screens
+- `css/styles.css`: the look (teal and yellow, light and dark mode)
+- `js/core.js`: the weekly check maths and tracker reading
+- `js/app.js`: everything that happens when you tap things
 - `api/claude.js`: sends requests to Claude using your secret key
 - `api/sheet.js`: reads your published sheet tabs
+- `api/health.js`: checks the server's settings and the Supabase connection
 - `manifest.webmanifest`, `sw.js`, `icon-*.png`: make it installable on your phone
+- `tests/`: automatic checks. They run on GitHub after every change (the green tick or red cross next to each commit)
