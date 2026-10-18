@@ -1,8 +1,7 @@
 // Reselling HQ: fetches your published Google Sheet tab as CSV.
+const { requireUser } = require("./_supabase");
 module.exports = async (req, res) => {
-  const password = process.env.APP_PASSWORD;
-  if (!password || req.headers["x-app-password"] !== password)
-    return res.status(401).json({ error: { code: "bad_password" } });
+  if (!(await requireUser(req, res))) return;
   let url;
   try { url = new URL(String(req.query.url || "")); } catch { return res.status(400).json({ error: { code: "bad_url" } }); }
   if (url.protocol !== "https:" || url.hostname !== "docs.google.com" || !url.pathname.startsWith("/spreadsheets/"))

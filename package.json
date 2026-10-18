@@ -12,7 +12,9 @@
     "test:all": "TZ=Europe/London vitest run && playwright test"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@playwright/test": "1.56.1",
+    "@supabase/supabase-js": "2.117.2",
     "vitest": "3.2.4"
   }
 }

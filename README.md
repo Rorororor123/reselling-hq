@@ -1,6 +1,6 @@
 # Reselling HQ (standalone version)
 
-Your own website for the weekly check, listing writer and buyer replies. You can install it on your phone like an app. It runs on your own Claude API key, and only people who know your app password can use it.
+Your own website for the weekly check, listing writer and buyer replies. You can install it on your phone like an app. It runs on your own Claude API key. You sign in with your email, and only emails on the allow list can get in.
 
 ## What you need
 
@@ -31,7 +31,7 @@ Your own website for the weekly check, listing writer and buyer replies. You can
 2. Click **Add New... then Project**, find `reselling-hq` and click **Import**.
 3. Open **Environment Variables** and add these two:
    - `ANTHROPIC_API_KEY`: the key from Step 1
-   - `APP_PASSWORD`: a password you'll type into the app (make it long, it protects your API credit)
+   - The Supabase settings in "Accounts" below
 4. Click **Deploy**. After about a minute you'll get a link like `reselling-hq.vercel.app`. That's your app.
 
 Optional: if a Claude model name ever stops working, add `CLAUDE_MODEL` (for the weekly check and listings) or `CLAUDE_MODEL_FAST` (for buyer replies) with a current model name from the Claude docs, then redeploy.
@@ -42,7 +42,7 @@ Optional: if a Claude model name ever stops working, add `CLAUDE_MODEL` (for the
 2. Click **File, Share, Publish to web**.
 3. In the first box choose **Inventory**, in the second choose **Comma-separated values (.csv)**, and click **Publish**. Copy the link.
 4. Do the same for the **Expenses** tab and copy that link too.
-5. Open your app, tap the **cog** (Settings), enter your app password and paste both links. Click **Save settings**.
+5. Open your app, sign in, tap the **cog** (Settings) and paste both links. Click **Save settings**.
 
 A published tab can be opened by anyone who has the exact link, though it isn't listed or searchable. Keep the links private. You can stop publishing at any time from the same menu.
 
@@ -51,7 +51,7 @@ A published tab can be opened by anyone who has the exact link, though it isn't 
 - **iPhone:** open your app link in Safari, tap **Share**, then **Add to Home Screen**.
 - **Android:** open it in Chrome, tap the **menu**, then **Install app** (or **Add to Home screen**).
 
-Enter your password and sheet links once on each device you use. Report history is saved on each device separately.
+Sign in once on each device. Your settings and report history are saved in your account, so every device shows the same thing.
 
 ## Using it
 
@@ -68,14 +68,27 @@ Enter your password and sheet links once on each device you use. Report history 
 
 Edit or replace a file on GitHub (open the file, click the pencil, then **Commit changes**). Vercel updates the live app automatically within a minute.
 
-## Supabase (database, from Stage 2)
+## Accounts (Supabase, from Stage 3)
 
-The app is being connected to Supabase (London region) ready for user accounts in Stage 3. For now it only checks the connection. Add these in Vercel, **Settings, Environment Variables**, ticked for **Preview** only:
+Sign-in and your saved data live in Supabase (London region). The database only ever lets a signed-in person see their own rows, and only emails on the allow list can create an account.
 
-- `SUPABASE_URL`: your project's URL (Supabase, Project Settings, Data API)
-- `SUPABASE_PUBLISHABLE_KEY`: the publishable key, starts `sb_publishable_` (Supabase, Project Settings, API Keys)
+**Vercel settings** (Settings, Environment Variables), needed for both **Preview** and **Production**:
 
-Then open `your-preview-link/api/health`. It shows `"supabase":"ok"` when everything's connected, or says what's missing. It never shows your keys.
+- `SUPABASE_URL`: your project's URL, like `https://abcd.supabase.co` (Supabase, Project Settings, Data API)
+- `SUPABASE_PUBLISHABLE_KEY`: starts `sb_publishable_` (Supabase, Project Settings, API Keys). Safe to be public.
+- `SUPABASE_SECRET_KEY`: starts `sb_secret_` (same page). Server only. Never paste it anywhere else.
+
+**Supabase, one time:**
+
+1. **SQL Editor, New query**: paste all of `supabase/migrations/001_accounts.sql`, click **Run**.
+2. Add your email to the allow list (SQL Editor): `insert into public.allowed_emails (email) values ('you@example.com') on conflict do nothing;`
+3. **Authentication, Hooks**: add a **Before User Created** hook, type **Postgres**, schema `public`, function `hook_before_user_created`.
+4. **Authentication, URL Configuration**: Site URL = your live address; Redirect URLs = your live address and your preview address pattern.
+5. Optional: **Authentication, Emails, Magic Link** template: add `{{ .Token }}` so the email also has a code (handy for the installed phone app).
+
+Supabase's built-in email only sends to people on your Supabase team and only a few an hour. Fine while it's just you; Stage 8 switches to Resend on your own domain.
+
+Check it any time at `your-link/api/health`: `"supabase":"ok"` and `"accounts":"ok (1 email on the allow list)"` mean all is well. It never shows your keys or emails.
 
 ## Files
 
@@ -83,8 +96,14 @@ Then open `your-preview-link/api/health`. It shows `"supabase":"ok"` when everyt
 - `css/styles.css`: the look (teal and yellow, light and dark mode)
 - `js/core.js`: the weekly check maths and tracker reading
 - `js/app.js`: everything that happens when you tap things
-- `api/claude.js`: sends requests to Claude using your secret key
-- `api/sheet.js`: reads your published sheet tabs
+- `js/account.js`: sign in, your settings and reports in your account, download my data, delete my account
+- `js/vendor/`: Supabase's sign-in library (a pinned copy, so the app doesn't depend on another website)
+- `api/claude.js`: sends requests to Claude using your secret key (signed-in, allowed accounts only)
+- `api/sheet.js`: reads your published sheet tabs (signed-in, allowed accounts only)
+- `api/account.js`: deletes your account and all its data
+- `api/config.js`: tells the app where Supabase is
+- `api/_supabase.js`: shared sign-in checks for the files above
+- `supabase/migrations/`: the database tables and security rules
 - `api/health.js`: checks the server's settings and the Supabase connection
 - `manifest.webmanifest`, `sw.js`, `icon-*.png`: make it installable on your phone
 - `tests/`: automatic checks. They run on GitHub after every change (the green tick or red cross next to each commit)

@@ -1,20 +1,8 @@
 // Reselling HQ: open /api/health to check the server's settings. Shows which settings exist, never their values.
-const NAMES = ["ANTHROPIC_API_KEY", "APP_PASSWORD", "SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY"];
+const { projectUrl } = require("./_supabase");
+const NAMES = ["ANTHROPIC_API_KEY", "APP_PASSWORD", "SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY"];
 // Public Supabase Auth addresses that answer with just the publishable key (sent as the apikey header).
 const CHECKS = ["/auth/v1/health", "/auth/v1/settings"];
-
-// Turn whatever was pasted into the bare project address, e.g. https://abcd.supabase.co
-// Copes with spaces, quotes, a missing https://, /rest/v1/ or any other path, and a dashboard link.
-function projectUrl(raw) {
-  let v = String(raw || "").trim().replace(/^["']|["']$/g, "");
-  if (!v) return null;
-  if (!/^https?:\/\//i.test(v)) v = "https://" + v;
-  let u;
-  try { u = new URL(v); } catch { return null; }
-  const dash = u.hostname.endsWith("supabase.com") && u.pathname.match(/\/project\/([a-z0-9]{20})/);
-  if (dash) return "https://" + dash[1] + ".supabase.co";
-  return u.origin;
-}
 
 module.exports = async (req, res) => {
   const env = process.env;
@@ -42,6 +30,7 @@ module.exports = async (req, res) => {
     out.supabaseUrl = url; // the project address isn't secret; the key is never shown
     if (url !== String(env.SUPABASE_URL).trim()) out.supabaseUrlNote = "extra bits on the end of SUPABASE_URL were ignored; you can tidy it to " + url;
     out.supabase = await check(url, key, out);
+    if (out.supabase === "ok") out.accounts = await checkAccounts(url, String(env.SUPABASE_SECRET_KEY || "").trim());
   }
   res.setHeader("cache-control", "no-store");
   res.status(out.supabase === "ok" ? 200 : 503).json(out);
@@ -63,6 +52,20 @@ async function check(url, key, out) {
   if (status === 401 || status === 403) return "Supabase refused the key: check SUPABASE_PUBLISHABLE_KEY is the publishable key (sb_publishable_) from this same project";
   if (status === 404) return "Supabase couldn't find " + out.checked + " (404): check SUPABASE_URL is the Project URL from Project Settings, Data API";
   return "Supabase answered with an error (" + status + "): it may be paused or restarting, check the Supabase dashboard";
+}
+
+// Sign-in needs the secret key and the Stage 3 tables. Counts the allow list without showing any email.
+async function checkAccounts(url, secret) {
+  if (!secret) return "not set up: add SUPABASE_SECRET_KEY in Vercel, then redeploy";
+  if (!secret.startsWith("sb_secret_")) return "SUPABASE_SECRET_KEY should start with sb_secret_: copy the secret key from Project Settings, API Keys";
+  let r;
+  try { r = await fetch(url + "/rest/v1/allowed_emails?select=email", { headers: { apikey: secret } }); } catch { return "couldn't reach Supabase"; }
+  if (r.status === 401 || r.status === 403) return "Supabase refused SUPABASE_SECRET_KEY: check it's the secret key from this same project";
+  if (r.status === 404) return "tables missing: run supabase/migrations/001_accounts.sql in the Supabase SQL Editor";
+  if (!r.ok) return "Supabase answered with an error (" + r.status + ")";
+  const n = (await r.json()).length;
+  if (!n) return "allow list is empty: add your email (see README, Stage 3 setup)";
+  return "ok (" + n + " email" + (n > 1 ? "s" : "") + " on the allow list)";
 }
 
 module.exports.projectUrl = projectUrl;
