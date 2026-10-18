@@ -1,0 +1,15 @@
+{
+  "name": "Reselling HQ",
+  "short_name": "Reselling HQ",
+  "description": "Weekly check, listing writer and buyer replies for your reselling business.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0F3A42",
+  "theme_color": "#0F3A42",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

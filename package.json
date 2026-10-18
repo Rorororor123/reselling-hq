@@ -1,0 +1,7 @@
+{
+  "name": "reselling-hq",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reselling HQ: weekly check, listing writer and buyer replies for a reselling business",
+  "engines": { "node": ">=18" }
+}
