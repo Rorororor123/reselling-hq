@@ -114,6 +114,17 @@ describe("api/health.js", () => {
     expect(JSON.stringify(res.body)).not.toContain("sb_publishable");
   });
 
+  it("lists which settings exist and which deployment answered, without values", async () => {
+    Object.assign(process.env, { SUPABASE_URL: "https://abcd.supabase.co", VERCEL_ENV: "preview",
+      VERCEL_GIT_COMMIT_REF: "claude/nice-cerf-59n5u2", VERCEL_GIT_COMMIT_SHA: "b625f17abcdef", VERCEL_PROJECT_PRODUCTION_URL: "reselling-hq.vercel.app" });
+    const res = fakeRes();
+    await health({}, res);
+    expect(res.body.settings).toEqual({ ANTHROPIC_API_KEY: "missing", APP_PASSWORD: "missing", SUPABASE_URL: "set", SUPABASE_PUBLISHABLE_KEY: "missing" });
+    expect(res.body.deployment).toEqual({ environment: "preview", branch: "claude/nice-cerf-59n5u2", commit: "b625f17", project: "reselling-hq.vercel.app" });
+    expect(JSON.stringify(res.body)).not.toContain("abcd.supabase.co");
+    for (const k of ["VERCEL_ENV", "VERCEL_GIT_COMMIT_REF", "VERCEL_GIT_COMMIT_SHA", "VERCEL_PROJECT_PRODUCTION_URL"]) delete process.env[k];
+  });
+
   it("explains a refused key", async () => {
     process.env.SUPABASE_URL = "https://abcd.supabase.co";
     process.env.SUPABASE_PUBLISHABLE_KEY = "wrong";
