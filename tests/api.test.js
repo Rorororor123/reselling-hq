@@ -121,7 +121,6 @@ describe("api/health.js", () => {
     await health({}, res);
     expect(res.body.settings).toEqual({ ANTHROPIC_API_KEY: "missing", APP_PASSWORD: "missing", SUPABASE_URL: "set", SUPABASE_PUBLISHABLE_KEY: "missing" });
     expect(res.body.deployment).toEqual({ environment: "preview", branch: "claude/nice-cerf-59n5u2", commit: "b625f17", project: "reselling-hq.vercel.app" });
-    expect(JSON.stringify(res.body)).not.toContain("abcd.supabase.co");
     for (const k of ["VERCEL_ENV", "VERCEL_GIT_COMMIT_REF", "VERCEL_GIT_COMMIT_SHA", "VERCEL_PROJECT_PRODUCTION_URL"]) delete process.env[k];
   });
 
@@ -132,6 +131,62 @@ describe("api/health.js", () => {
     const res = fakeRes();
     await health({}, res);
     expect(res.body.supabase).toMatch(/refused the key/);
+  });
+
+  it("tidies whatever was pasted into the bare project address", () => {
+    const { projectUrl } = health;
+    for (const v of ["https://abcd1234.supabase.co", "https://abcd1234.supabase.co/", "https://abcd1234.supabase.co/rest/v1/",
+      "https://abcd1234.supabase.co/rest/v1", "  https://abcd1234.supabase.co/rest/v1/  ", "abcd1234.supabase.co", '"https://abcd1234.supabase.co"']) {
+      expect(projectUrl(v), v).toBe("https://abcd1234.supabase.co");
+    }
+    expect(projectUrl("https://supabase.com/dashboard/project/abcdefghijklmnopqrst/settings/api")).toBe("https://abcdefghijklmnopqrst.supabase.co");
+    expect(projectUrl("")).toBeNull();
+    expect(projectUrl("not a url at all")).toBeNull();
+  });
+
+  it("calls the right address even when SUPABASE_URL ends in /rest/v1/", async () => {
+    process.env.SUPABASE_URL = "https://abcd1234.supabase.co/rest/v1/";
+    process.env.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_x";
+    const fetch = vi.fn(async () => reply(200, {})); vi.stubGlobal("fetch", fetch);
+    const res = fakeRes();
+    await health({}, res);
+    expect(fetch.mock.calls[0][0]).toBe("https://abcd1234.supabase.co/auth/v1/health");
+    expect(res.body.supabase).toBe("ok");
+    expect(res.body.checked).toBe("https://abcd1234.supabase.co/auth/v1/health");
+    expect(res.body.supabaseUrlNote).toMatch(/tidy it to https:\/\/abcd1234.supabase.co/);
+  });
+
+  it("tries the Auth settings address if the health address isn't found", async () => {
+    process.env.SUPABASE_URL = "https://abcd1234.supabase.co";
+    process.env.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_x";
+    const fetch = vi.fn().mockResolvedValueOnce(reply(404, {})).mockResolvedValueOnce(reply(200, {}));
+    vi.stubGlobal("fetch", fetch);
+    const res = fakeRes();
+    await health({}, res);
+    expect(fetch.mock.calls.map(c => c[0])).toEqual(["https://abcd1234.supabase.co/auth/v1/health", "https://abcd1234.supabase.co/auth/v1/settings"]);
+    expect(res.body.supabase).toBe("ok");
+    expect(res.body.supabaseUrlNote).toBeUndefined();
+  });
+
+  it("explains a 404 by naming the address, not blaming a pause", async () => {
+    process.env.SUPABASE_URL = "https://abcd1234.supabase.co";
+    process.env.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_x";
+    vi.stubGlobal("fetch", vi.fn(async () => reply(404, {})));
+    const res = fakeRes();
+    await health({}, res);
+    expect(res.body.supabase).toMatch(/couldn't find https:\/\/abcd1234.supabase.co\/auth\/v1\/settings \(404\)/);
+    expect(res.body.supabase).not.toMatch(/paused/);
+  });
+
+  it("warns if the secret key was pasted into the publishable setting, without calling Supabase", async () => {
+    process.env.SUPABASE_URL = "https://abcd1234.supabase.co";
+    process.env.SUPABASE_PUBLISHABLE_KEY = "sb_secret_oops";
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+    const res = fakeRes();
+    await health({}, res);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(res.body.supabase).toMatch(/secret key/);
+    expect(JSON.stringify(res.body)).not.toContain("sb_secret_oops");
   });
 });
 
