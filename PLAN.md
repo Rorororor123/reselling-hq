@@ -1,6 +1,6 @@
 # Reselling HQ: build plan
 
-Status: Stage 1 (this plan) is done. Next up: Stage 2.
+Status: Stages 1 and 2 are done. Next up: Stage 3.
 All prices are rough guides from October 2026 at about $1 = £0.78. Check the live pricing pages before you rely on them. Tax and money figures are guides, not advice.
 
 ## Things to do now (before Stage 2)
@@ -79,6 +79,8 @@ Done when: PLAN.md is in the repo and you're happy with it.
 - Update the Claude web search tool to the current version.
 
 Done when: the preview link looks and behaves exactly like today, tests run and pass, and Supabase is connected.
+
+Finished (18 October 2026): `index.html` is now `index.html` + `css/styles.css` + `js/core.js` (maths) + `js/app.js` (screens); screenshots of every screen before and after the split match pixel for pixel. 48 unit tests (Vitest) and 12 browser tests (Playwright, phone light/dark and desktop) run on every push via GitHub Actions, and pass. Web search is now `web_search_20260209`, and if Claude ever rejects it the app says so plainly. `/api/health` shows which settings are set and confirms the Supabase connection: confirmed `supabase: ok` on the preview. Supabase settings (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`) must be added inside the project's own Settings; `SUPABASE_URL` is just `https://<ref>.supabase.co`. The publishable key is Preview only for now; the secret key is added in Stage 3.
 
 ### Stage 3: Accounts and private data (only you use the app)
 - Sign up and log in with email (a magic link plus an optional password), using Supabase Auth. Login emails go out through Resend on your domain.
@@ -255,7 +257,7 @@ Notes:
 
 ## Progress
 - [x] Stage 1: Plan
-- [ ] Stage 2: Foundations
+- [x] Stage 2: Foundations
 - [ ] Stage 3: Accounts and private data (only you)
 - [ ] Stage 4: Built-in spreadsheet, imports (incl. StockX CSV) and backups (only you)
 - [ ] Stage 5: Claude usage limits (only you)

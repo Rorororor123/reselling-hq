@@ -3,6 +3,8 @@ const MODELS = {
   default: process.env.CLAUDE_MODEL || "claude-sonnet-5-5",
   quick: process.env.CLAUDE_MODEL_FAST || "claude-haiku-5-5",
 };
+// Current web search version (with dynamic filtering) for Sonnet 5.5.
+const WEB_SEARCH = { type: "web_search_20260209", name: "web_search", max_uses: 6 };
 
 function fail(res, status, code, message) {
   res.status(status).json({ error: { code, message: message || code } });
@@ -33,7 +35,7 @@ module.exports = async (req, res) => {
     max_tokens: Math.min(Number(maxTokens) || 3000, 8000),
     messages,
   };
-  if (webSearch) request.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: 6 }];
+  if (webSearch) request.tools = [WEB_SEARCH];
 
   try {
     let last;
@@ -45,8 +47,11 @@ module.exports = async (req, res) => {
       });
       const j = await r.json();
       if (!r.ok) {
-        const code = r.status === 429 ? "rate_limited" : r.status === 401 ? "no_key" : "upstream_error";
-        return fail(res, 502, code, (j.error && j.error.message) || "Claude API error");
+        const msg = (j.error && j.error.message) || "Claude API error";
+        // A 400 that names the tool means Claude refused this web search version, so say so plainly.
+        const toolRejected = r.status === 400 && webSearch && /web_search|tools/i.test(msg);
+        const code = toolRejected ? "search_tool_rejected" : r.status === 429 ? "rate_limited" : r.status === 401 ? "no_key" : "upstream_error";
+        return fail(res, 502, code, msg);
       }
       last = j;
       if (j.stop_reason === "pause_turn") { messages.push({ role: "assistant", content: j.content }); continue; }
@@ -64,3 +69,4 @@ module.exports = async (req, res) => {
     fail(res, 502, "upstream_error", String(e && e.message));
   }
 };
+module.exports.WEB_SEARCH = WEB_SEARCH;

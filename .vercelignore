@@ -1,0 +1,7 @@
+# Test files and developer tools: not part of the live website.
+tests/
+playwright.config.js
+test-results/
+playwright-report/
+.github/
+vitest.config.js
