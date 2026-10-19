@@ -6,14 +6,11 @@ const MODELS = {
 // Current web search version (with dynamic filtering) for Sonnet 5.5.
 const WEB_SEARCH = { type: "web_search_20260209", name: "web_search", max_uses: 6 };
 
-function fail(res, status, code, message) {
-  res.status(status).json({ error: { code, message: message || code } });
-}
+const { fail, requireUser } = require("./_supabase");
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return fail(res, 405, "method_not_allowed");
-  const password = process.env.APP_PASSWORD;
-  if (!password || req.headers["x-app-password"] !== password) return fail(res, 401, "bad_password");
+  if (!(await requireUser(req, res))) return;
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return fail(res, 500, "no_key");
 

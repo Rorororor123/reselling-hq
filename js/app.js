@@ -4,19 +4,18 @@ const $ = s => document.querySelector(s);
 
 /* ---------- settings ---------- */
 const DEFAULTS = {inv:"", exp:"", stale:30, stalePk:90, offer:85, min:5, post:2, budget:200, source:"retail drops, charity shops, car boots, online deals"};
-let S = {...DEFAULTS};
-try { S = {...DEFAULTS, ...JSON.parse(localStorage.getItem("rhq-settings") || "{}")}; } catch {}
+/* Settings live in your account (js/account.js). setup = which "Get set up" steps are ticked. */
+const account = window.RHQAccount;
+let S = {...DEFAULTS}, setup = {};
 const map = {inv:"sInv",exp:"sExp",stale:"sStale",stalePk:"sStalePk",offer:"sOffer",min:"sMin",post:"sPost",budget:"sBudget",source:"sSource"};
-for (const [k,id] of Object.entries(map)) $("#"+id).value = S[k];
-try { $("#sPw").value = localStorage.getItem("rhq-pw") || ""; } catch {}
-$("#setForm").addEventListener("submit", e => {
+const saveAll = () => account.saveSettings({...S, setup});
+$("#setForm").addEventListener("submit", async e => {
   e.preventDefault();
   for (const [k,id] of Object.entries(map)) { const v = $("#"+id).value; S[k] = typeof DEFAULTS[k] === "number" ? Number(v) || DEFAULTS[k] : v.trim() || DEFAULTS[k]; }
   for (const k of ["inv","exp"]) S[k] = $("#"+map[k]).value.trim();
-  try { localStorage.setItem("rhq-settings", JSON.stringify(S)); } catch {}
-  const pw = $("#sPw").value; if (pw) { try { localStorage.setItem("rhq-pw", pw); } catch {} rememberSetup("c-drive"); }
-  if (S.inv) rememberSetup("c-sheet");
-  $("#setMsg").textContent = "Saved.";
+  if (S.inv) setup["c-sheet"] = true;
+  try { await saveAll(); $("#setMsg").textContent = "Saved."; if (S.inv) mark("c-sheet", true); }
+  catch { $("#setMsg").textContent = "Couldn't save just now. Check your connection and try again."; return; }
   setTimeout(() => $("#setMsg").textContent = "", 2000);
 });
 
@@ -35,11 +34,10 @@ const TY = taxYear();
 $("#taxyr").textContent = "UK tax year " + TY.label;
 
 /* ---------- capabilities ---------- */
-/* Standalone: Claude runs through this site's /api/claude, history lives in this browser. */
-function getPw() { try { return localStorage.getItem("rhq-pw") || ""; } catch { return ""; } }
+/* Claude runs through this site's /api/claude, signed in as you. History lives in your account. */
 async function api(path, body, signal) {
   let r;
-  try { r = await fetch(path, {method: body ? "POST" : "GET", headers: {"content-type": "application/json", "x-app-password": getPw()}, body: body ? JSON.stringify(body) : undefined, signal}); }
+  try { r = await fetch(path, {method: body ? "POST" : "GET", headers: {"content-type": "application/json", authorization: "Bearer " + await account.token()}, body: body ? JSON.stringify(body) : undefined, signal}); }
   catch (e) { throw {code: e && e.name === "AbortError" ? "cancelled" : "offline"}; }
   let j = {}; try { j = await r.json(); } catch {}
   if (!r.ok) throw {code: (j.error && j.error.code) || "upstream_error", message: j.error && j.error.message};
@@ -62,15 +60,15 @@ const sample = async (prompt, o = {}) => {
 sample.json = async (p, o) => looseJson((await sample(p, o)).text);
 sample.limits = async () => ({images: {maxCount: 6}});
 const mcp = null, uid = "me";
-const db = {collection: path => {
-  const key = "rhq-" + path;
-  const all = () => { try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; } };
-  const q = {n: 50, orderBy() { return q; }, limit(n) { q.n = n; return q; },
-    async get() { return {docs: Object.values(all()).sort((x, y) => (y.ts || 0) - (x.ts || 0)).slice(0, q.n).map(d => ({data: () => d}))}; },
-    doc: id => ({async set(obj) { const a = all(); a[id] = obj; const ks = Object.keys(a).sort().reverse(); ks.slice(52).forEach(k => delete a[k]); localStorage.setItem(key, JSON.stringify(a)); }})};
-  return q;
-}};
-const capsReady = Promise.resolve();
+const db = {collection: () => account.reports};
+const capsReady = account.ready.then(({settings}) => {
+  if (!settings) setStatus("Couldn't load your settings just now, so the standard ones are in use. Reload to try again.", true);
+  const {setup: done, ...saved} = settings || {};
+  S = {...DEFAULTS, ...saved}; setup = done || {};
+  for (const [k,id] of Object.entries(map)) $("#"+id).value = S[k];
+  setup["c-drive"] = true; // signed in
+  for (const k in setup) if (setup[k]) mark(k, true);
+});
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 
 /* ---------- reading the tracker ---------- */
@@ -84,7 +82,6 @@ $("#csvIn").addEventListener("change", async e => {
 
 async function readFromDrive() {
   if (!S.inv) throw {friendly: "Add your Inventory tab's CSV link in Settings first, or use CSV files instead."};
-  if (!getPw()) throw {friendly: "Enter your app password in Settings first."};
   const get = async u => { try { return (await api("/api/sheet?url=" + encodeURIComponent(u))).text; } catch (e) { throw {friendly: sheetErr(e)}; } };
   const inv = await get(S.inv);
   const exp = S.exp ? await get(S.exp) : "";
@@ -92,7 +89,8 @@ async function readFromDrive() {
 }
 function sheetErr(e) {
   switch (e && e.code) {
-    case "bad_password": return "Wrong app password. Open Settings and enter it again.";
+    case "signed_out": return "You've been signed out. Reload the page and sign in again.";
+    case "not_allowed": return "This account isn't on the Reselling HQ invite list.";
     case "bad_url": return "That sheet link doesn't look right. It should start with https://docs.google.com/spreadsheets/ and end in output=csv.";
     case "not_published": return "Google wouldn't share the sheet. Check the tab is published to the web as CSV.";
     case "offline": return "You seem to be offline. Check your connection and try again.";
@@ -136,7 +134,9 @@ function step(k, s) { const li = document.querySelector(`#steps li[data-k="${k}"
 function setStatus(t, err) { const el = $("#status"); el.textContent = t; el.classList.toggle("err", !!err); }
 function sampleErr(e) {
   switch (e && e.code) {
-    case "bad_password": return "Wrong app password. Open Settings and enter it again.";
+    case "signed_out": return "You've been signed out. Reload the page and sign in again.";
+    case "not_allowed": return "This account isn't on the Reselling HQ invite list, so Claude can't run for it.";
+    case "not_set_up": return "Sign-in isn't fully set up on the server yet (SUPABASE_SECRET_KEY is missing in Vercel).";
     case "no_key": return "The app has no Claude API key yet. Add ANTHROPIC_API_KEY in Vercel, then redeploy.";
     case "search_tool_rejected": return "The Claude API rejected the web search tool (version web_search_20260209), so Claude's advice couldn't run. Your numbers are below. Please send this message to Claude Code so it can be fixed." + (e.message ? " Claude said: " + String(e.message).slice(0, 200) : "");
     case "offline": return "You seem to be offline. Check your connection and try again.";
@@ -271,7 +271,6 @@ function showLastRun(ts) { if (ts) $("#lastRun").innerHTML = "Last run <b>" + es
 const hr = new Date().getHours();
 $("#greet").textContent = (hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening") + ". Ready for your weekly check?";
 (async () => {
-  try { const done = JSON.parse(localStorage.getItem("rhq-setup") || "{}"); for (const k in done) if (done[k]) mark(k, true); } catch {}
   await capsReady;
   if (mcp) {
     try { const r = await mcp.listTools("Google Drive"); const s = r.servers && r.servers[0]; if (s && s.authStatus === "connected") mark("c-drive", true); else if (!s) mark("c-drive", false); } catch {}
@@ -284,7 +283,7 @@ $("#greet").textContent = (hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon"
     } catch {}
   }
 })();
-function rememberSetup(k) { mark(k, true); try { const d = JSON.parse(localStorage.getItem("rhq-setup") || "{}"); d[k] = true; localStorage.setItem("rhq-setup", JSON.stringify(d)); } catch {} }
+function rememberSetup(k) { mark(k, true); if (!setup[k]) { setup[k] = true; saveAll().catch(() => {}); } }
 
 /* example state on first load */
 renderReport({example: true, nums: {

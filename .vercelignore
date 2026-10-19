@@ -5,3 +5,4 @@ test-results/
 playwright-report/
 .github/
 vitest.config.js
+supabase/

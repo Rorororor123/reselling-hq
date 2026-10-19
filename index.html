@@ -34,7 +34,36 @@
   <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3"/></symbol>
 </svg>
 
-<div class="shell">
+<div class="gate" id="gate">
+  <div class="gatecard">
+    <div class="brand"><span class="tagmark" aria-hidden="true"></span><b>Reselling HQ</b></div>
+    <div data-state="out pw sent" hidden><h2>Sign in</h2><p class="lede" data-state="out pw" hidden>Your stock, reports and settings, on every device.</p></div>
+    <form class="tool" id="gLinkForm" data-state="out pw" hidden novalidate>
+      <label>Email<input type="email" id="gEmail" autocomplete="email" inputmode="email" placeholder="you@example.com"></label>
+      <div data-state="out" hidden><button class="btn primary wide" id="gLinkBtn" type="submit">Email me a sign-in link</button></div>
+    </form>
+    <form class="tool" id="gPwForm" data-state="pw" hidden>
+      <label>Password<input type="password" id="gPw" autocomplete="current-password"></label>
+      <button class="btn primary wide" id="gPwBtn" type="submit">Sign in</button>
+    </form>
+    <div data-state="sent" hidden class="tool">
+      <p class="lede">We've emailed a sign-in link to <b id="gSentTo"></b>. Open it on this phone or computer. It can take a minute, and check your spam folder.</p>
+      <form class="tool" id="gCodeForm">
+        <label>Or type the code from the email<input type="text" id="gCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456"></label>
+        <button class="btn primary wide" id="gCodeBtn" type="submit">Sign in with code</button>
+      </form>
+    </div>
+    <p class="gatemsg" id="gateMsg" role="status"></p>
+    <div class="btnrow">
+      <button class="linkbtn" id="gUsePw" type="button" data-state="out" hidden>Use a password instead</button>
+      <button class="linkbtn" id="gUseLink" type="button" data-state="pw" hidden>Use an email link instead</button>
+      <button class="linkbtn" id="gBack" type="button" data-state="sent" hidden>Use a different email</button>
+    </div>
+    <p class="note" data-state="out pw" hidden>Reselling HQ is private for now: only invited emails can sign in.</p>
+  </div>
+</div>
+
+<div class="shell" hidden>
   <aside class="rail">
     <div class="brand"><span class="tagmark" aria-hidden="true"></span><b>Reselling HQ</b></div>
     <nav class="menu" aria-label="Main">
@@ -59,6 +88,11 @@
 
 <!-- HOME -->
 <section class="tab" id="home">
+  <div class="card movecard" id="moveCard" hidden>
+    <div class="cardhead"><h3>Move this device's data into your account?</h3></div>
+    <p class="lede" style="margin:0 0 14px">This phone or computer still has <b id="moveWhat"></b> saved from before accounts. Move them in so they show on all your devices.</p>
+    <div class="btnrow"><button class="btn primary" id="moveYes">Move them into my account</button><button class="btn" id="moveNo">Not now</button><span class="sub" id="moveMsg"></span></div>
+  </div>
   <div class="hero">
     <div>
       <h2 id="greet">Your weekly check</h2>
@@ -91,7 +125,7 @@
   <div class="card" id="setupCard">
     <div class="cardhead"><h3>Get set up</h3><span class="count" id="setupCount">0 of 4</span></div>
     <ul class="check">
-      <li id="c-drive"><span class="tick"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span><div><b>Enter your app password</b><small>Open Settings (the cog) and type the password you chose when you set the app up.</small></div></li>
+      <li id="c-drive"><span class="tick"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span><div><b>Sign in</b><small>Done. Your settings and reports are saved in your account.</small></div></li>
       <li id="c-sheet"><span class="tick"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span><div><b>Link your Google Sheet</b><small>Publish the Inventory and Expenses tabs as CSV and paste both links into Settings.</small></div></li>
       <li id="c-claude"><span class="tick"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span><div><b>Claude connected</b><small>Ticks itself once Claude answers for the first time.</small></div></li>
       <li id="c-run"><span class="tick"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span><div><b>Run your first weekly check</b><small>Press the yellow button above.</small></div></li>
@@ -156,7 +190,7 @@
     <details open><summary>Set up (one time, about 15 minutes)</summary><ol>
       <li>In your Google Sheet, choose File, Share, Publish to web. Pick the <b>Inventory</b> tab and <b>Comma-separated values (.csv)</b>, then Publish and copy the link.</li>
       <li>Do the same for the <b>Expenses</b> tab.</li>
-      <li>Open Settings in this app, enter your app password and paste both links. Check your stale limits, offer rules and budget, then Save.</li>
+      <li>Open Settings in this app and paste both links. Check your stale limits, offer rules and budget, then Save.</li>
       <li>Press <b>Run my weekly check</b>.</li>
     </ol></details>
     <details><summary>Every week</summary><ol>
@@ -167,7 +201,7 @@
     </ol></details>
     <details><summary>Writing a listing</summary><p>Go to Listings, add photos, type a line about the item (brand, model, size, condition, flaws), and press Write listing. Copy each section into eBay or Vinted. Always check sizes and condition before posting.</p></details>
     <details><summary>Replying to a buyer</summary><p>Go to Replies, paste their message, add the listed price and your cost, then press Draft reply. It accepts offers above your lowest price (set in Settings) and counters ones below it.</p></details>
-    <details><summary>It says my password is wrong</summary><p>Open Settings and type the password again. It must match the APP_PASSWORD you set in Vercel.</p></details>
+    <details><summary>Signing in on a new phone</summary><p>Open the app, type your email and tap Email me a sign-in link. Open the link on that same phone, or type the code from the email into the app (handy if you installed the app on your home screen). You stay signed in until you press Sign out in Settings. To skip the email, set a password in Settings.</p></details>
     <details><summary>It can't read my sheet</summary><p>Check both links in Settings start with https://docs.google.com/spreadsheets/ and end in output=csv. Or press "Use CSV files instead": open each tab, choose File, Download, CSV, then pick both files.</p></details>
     <details><summary>Are the drops and niche ideas live?</summary><p>Yes. Claude searches the web during your weekly check for release dates and recent sold prices. Still double-check before you spend money. Your profit, stock and stale numbers come straight from your own sheet.</p></details>
     <details><summary>Install it on your phone</summary><p>iPhone: open the site in Safari, tap Share, then Add to Home Screen. Android: open it in Chrome, tap the menu, then Install app or Add to Home screen.</p></details>
@@ -177,11 +211,24 @@
 
 <!-- SETTINGS -->
 <section class="tab" id="set" hidden>
-  <div><h2>Settings</h2><p class="lede">Saved on this device. Fill these in on each phone or computer you use.</p></div>
+  <div><h2>Settings</h2><p class="lede">Saved in your account, so every phone and computer you sign in on uses the same settings.</p></div>
+  <div class="card">
+    <div class="cardhead"><h3>Your account</h3></div>
+    <p style="margin:0 0 14px">Signed in as <b id="accEmail"></b></p>
+    <form class="tool" id="accPwForm" style="margin-bottom:16px">
+      <label>Set a password (optional, lets you sign in without an email)<input type="password" id="accPw" autocomplete="new-password" minlength="8" placeholder="At least 8 characters"></label>
+      <div class="btnrow"><button class="btn" type="submit">Save password</button><span class="sub" id="accPwMsg"></span></div>
+    </form>
+    <div class="btnrow">
+      <button class="btn" id="accSignOut" type="button">Sign out</button>
+      <button class="btn" id="accDownload" type="button">Download my data</button>
+      <button class="btn danger" id="accDelete" type="button">Delete my account</button>
+    </div>
+    <p class="sub" id="accMsg" role="status" style="margin:10px 0 0"></p>
+  </div>
   <div class="card">
   <form class="tool" id="setForm">
     <h3>Your tracker</h3>
-    <label>App password<input type="password" id="sPw" autocomplete="current-password" placeholder="The APP_PASSWORD you set in Vercel"></label>
     <label>Inventory tab CSV link<input type="text" id="sInv" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?gid=0&amp;single=true&amp;output=csv"></label>
     <label>Expenses tab CSV link<input type="text" id="sExp" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?gid=...&amp;output=csv"></label>
     <h3>Stale stock</h3>
@@ -209,7 +256,9 @@
   </main>
 </div>
 
+<script src="/js/vendor/supabase-2.117.2.js"></script>
 <script src="/js/core.js"></script>
+<script src="/js/account.js"></script>
 <script src="/js/app.js"></script>
 
 </body>
