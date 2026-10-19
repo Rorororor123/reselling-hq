@@ -1,6 +1,8 @@
 // Reselling HQ: open /api/health to check the server's settings. Shows which settings exist, never their values.
 const { projectUrl } = require("./_supabase");
-const NAMES = ["ANTHROPIC_API_KEY", "APP_PASSWORD", "SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY"];
+const E = require("./_ebay");
+const NAMES = ["ANTHROPIC_API_KEY", "APP_PASSWORD", "SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY",
+  "EBAY_ENV", "EBAY_CLIENT_ID", "EBAY_CLIENT_SECRET", "EBAY_RUNAME", "EBAY_TOKEN_KEY", "EBAY_VERIFICATION_TOKEN", "CRON_SECRET", "EBAY_FINANCES"];
 // Public Supabase Auth addresses that answer with just the publishable key (sent as the apikey header).
 const CHECKS = ["/auth/v1/health", "/auth/v1/settings"];
 
@@ -32,6 +34,7 @@ module.exports = async (req, res) => {
     out.supabase = await check(url, key, out);
     if (out.supabase === "ok") out.accounts = await checkAccounts(url, String(env.SUPABASE_SECRET_KEY || "").trim());
   }
+  out.ebay = await checkEbay(env, out.supabase === "ok" && url, String(env.SUPABASE_SECRET_KEY || "").trim());
   res.setHeader("cache-control", "no-store");
   res.status(out.supabase === "ok" ? 200 : 503).json(out);
 };
@@ -66,6 +69,28 @@ async function checkAccounts(url, secret) {
   const n = (await r.json()).length;
   if (!n) return "allow list is empty: add your email (see README, Stage 3 setup)";
   return "ok (" + n + " email" + (n > 1 ? "s" : "") + " on the allow list)";
+}
+
+// eBay (Stage 5): the settings are all there, eBay accepts the keys, and the eBay tables exist.
+async function checkEbay(env, url, secret) {
+  if (!env.EBAY_CLIENT_ID && !env.EBAY_CLIENT_SECRET && !env.EBAY_RUNAME) return "not set up: add the EBAY_ settings in Vercel (see README, eBay)";
+  const s = E.settings(env);
+  const missing = ["EBAY_CLIENT_ID", "EBAY_CLIENT_SECRET", "EBAY_RUNAME", "EBAY_TOKEN_KEY"].filter(n => !String(env[n] || "").trim());
+  if (missing.length) return "missing " + missing.join(", ");
+  if (!s.key) return "EBAY_TOKEN_KEY should be 32 random bytes in base64 (44 characters ending in =): make one with the SQL in the README";
+  if (/^https?:/i.test(s.ruName)) return "EBAY_RUNAME should be the RuName eBay shows (like Your_Name-YourName-Resell-abcde), not a web address";
+  try { await E.appToken(s); } catch (e) {
+    if (e.code === "ebay_unreachable") return "couldn't reach eBay";
+    return "eBay refused EBAY_CLIENT_ID or EBAY_CLIENT_SECRET: check they're the " + s.env + " keys (App ID and Cert ID) from the same keyset";
+  }
+  if (url && secret) {
+    try {
+      const r = await fetch(url + "/rest/v1/ebay_connections?select=user_id&limit=1", { headers: { apikey: secret } });
+      if (r.status === 404) return "tables missing: run supabase/migrations/003_ebay.sql in the Supabase SQL Editor";
+    } catch { /* the Supabase check above already says so */ }
+  }
+  const extra = [!s.verificationToken ? "EBAY_VERIFICATION_TOKEN missing (needed for production keys)" : "", !s.cronSecret ? "CRON_SECRET missing (the daily sync won't run)" : ""].filter(Boolean);
+  return "ok (" + s.env + ")" + (extra.length ? "; " + extra.join("; ") : "");
 }
 
 module.exports.projectUrl = projectUrl;

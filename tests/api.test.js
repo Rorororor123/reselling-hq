@@ -225,7 +225,8 @@ describe("api/health.js", () => {
       VERCEL_GIT_COMMIT_REF: "claude/nice-cerf-59n5u2", VERCEL_GIT_COMMIT_SHA: "b625f17abcdef", VERCEL_PROJECT_PRODUCTION_URL: "reselling-hq.vercel.app" });
     const res = fakeRes();
     await health({}, res);
-    expect(res.body.settings).toEqual({ ANTHROPIC_API_KEY: "missing", APP_PASSWORD: "missing", SUPABASE_URL: "set", SUPABASE_PUBLISHABLE_KEY: "missing", SUPABASE_SECRET_KEY: "missing" });
+    expect(res.body.settings).toEqual({ ANTHROPIC_API_KEY: "missing", APP_PASSWORD: "missing", SUPABASE_URL: "set", SUPABASE_PUBLISHABLE_KEY: "missing", SUPABASE_SECRET_KEY: "missing",
+      EBAY_ENV: "missing", EBAY_CLIENT_ID: "missing", EBAY_CLIENT_SECRET: "missing", EBAY_RUNAME: "missing", EBAY_TOKEN_KEY: "missing", EBAY_VERIFICATION_TOKEN: "missing", CRON_SECRET: "missing", EBAY_FINANCES: "missing" });
     expect(res.body.deployment).toEqual({ environment: "preview", branch: "claude/nice-cerf-59n5u2", commit: "b625f17", project: "reselling-hq.vercel.app" });
     for (const k of ["VERCEL_ENV", "VERCEL_GIT_COMMIT_REF", "VERCEL_GIT_COMMIT_SHA", "VERCEL_PROJECT_PRODUCTION_URL"]) delete process.env[k];
   });
@@ -340,7 +341,7 @@ describe("sw.js", () => {
     const shell = JSON.parse(src.match(/const SHELL = (\[.*?\]);/)[1]);
     expect(shell).toEqual(expect.arrayContaining(["/css/styles.css", "/js/core.js", "/js/app.js"]));
     for (const p of shell) if (p !== "/") expect(fs.existsSync(new URL(".." + p, import.meta.url)), p).toBe(true);
-    expect(shell).toEqual(expect.arrayContaining(["/js/account.js", "/js/tracker.js", "/js/stock.js", "/js/xlsx.js", "/js/vendor/supabase-2.117.2.js"]));
-    expect(src).toContain('const CACHE = "rhq-v5"');
+    expect(shell).toEqual(expect.arrayContaining(["/js/account.js", "/js/tracker.js", "/js/stock.js", "/js/xlsx.js", "/js/ebay.js", "/js/vendor/supabase-2.117.2.js"]));
+    expect(src).toContain('const CACHE = "rhq-v6"');
   });
 });

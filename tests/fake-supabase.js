@@ -16,7 +16,8 @@ const TRACKER = ["orders", "items", "expenses"];
 // What the database fills in itself when a row is added (see supabase/migrations/002_tracker.sql).
 const DEFAULTS = {
   orders: () => ({ shop: "", order_ref: "", ordered: "2026-10-18", qty: 1, cost: 0, courier: "", tracking: "", status: "Ordered", preorder: false, release: null, category: "", size: "", notes: "", stocked_at: null }),
-  items: () => ({ category: "", size: "", cost: null, status: "In stock", bought: null, listed: null, ask_price: null, platform: "", sold: null, sale_price: null, fees: 0, postage: 0, posted: false, notes: "", order_id: null, import_id: null }),
+  items: () => ({ category: "", size: "", cost: null, status: "In stock", bought: null, listed: null, ask_price: null, platform: "", sold: null, sale_price: null, fees: 0, postage: 0, posted: false, notes: "", order_id: null, import_id: null,
+    source: "", source_ref: null, source_title: null, prev_status: null, needs_review: null }),
   expenses: () => ({ date: "2026-10-18", category: "Other", repeat: "once", end_date: null, deductible: true, notes: "" }),
 };
 
@@ -37,6 +38,8 @@ async function useFakeSupabase(page, { signedInAs = "me@example.com", allowed = 
   const issue = user => { const s = session(user); byToken.set(s.access_token, user); return s; };
 
   await page.route("**/api/config", route => route.fulfill({ json: { supabaseUrl: URL_BASE, publishableKey: "sb_publishable_test" } }));
+  // eBay isn't set up unless a test says otherwise (tests/ebay.spec.js routes /api/ebay itself).
+  await page.route(u => u.pathname === "/api/ebay", route => route.fulfill({ json: { configured: false, env: "sandbox", connected: false } }));
   await page.route("**/api/account", async route => {
     const user = byToken.get((route.request().headers().authorization || "").replace(/^Bearer /, ""));
     if (!user || route.request().method() !== "DELETE") return route.fulfill({ status: 401, json: { error: { code: "signed_out" } } });

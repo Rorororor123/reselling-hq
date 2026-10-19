@@ -1,6 +1,6 @@
 // Reselling HQ service worker: makes the app installable and opens fast. Never caches /api.
-const CACHE = "rhq-v5";
-const SHELL = ["/", "/index.html", "/css/styles.css", "/js/vendor/supabase-2.117.2.js", "/js/core.js", "/js/account.js", "/js/app.js", "/js/xlsx.js", "/js/tracker.js", "/js/stock.js", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
+const CACHE = "rhq-v6";
+const SHELL = ["/", "/index.html", "/css/styles.css", "/js/vendor/supabase-2.117.2.js", "/js/core.js", "/js/account.js", "/js/app.js", "/js/xlsx.js", "/js/tracker.js", "/js/stock.js", "/js/ebay.js", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))));

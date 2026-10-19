@@ -1,0 +1,4 @@
+{
+  "crons": [{ "path": "/api/ebay", "schedule": "17 4 * * *" }],
+  "functions": { "api/ebay.js": { "maxDuration": 60 } }
+}

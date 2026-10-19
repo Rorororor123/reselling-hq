@@ -309,8 +309,13 @@ function dashboard({items = [], orders = [], expenses = []}, settings = {}, now 
     actions.push({level: "warn", kind: "order", id: o.id, title: `${o.item} hasn't shipped`, detail: `Ordered ${daysBetween(parseDate(o.ordered), today)} days ago${o.shop ? " from " + o.shop : ""}: check with the shop`});
   for (const o of pre) { const r = parseDate(o.release); if (r && daysBetween(today, r) <= 7)
     actions.push({level: "info", kind: "order", id: o.id, title: `${o.item} releases ${daysBetween(today, r) === 0 ? "today" : shortDate(r)}`, detail: "Pre-order" + (o.shop ? " from " + o.shop : "") + ": keep an eye out for the shipping email"}); }
+  // eBay sales the sync wasn't sure about come first.
+  const REVIEW = {new: "Didn't match your stock: pick the item it was, or add its cost", match: "Matched to your stock by name: check it's the right item",
+    cancelled: "eBay says this order was cancelled or refunded: undo the sale or keep it"};
+  actions.unshift(...items.filter(i => REVIEW[i.needs_review]).map(i => ({level: "warn", kind: "review", id: i.id,
+    title: i.needs_review === "cancelled" ? `${i.name}: eBay order cancelled` : `Check eBay sale: ${i.name}`, detail: REVIEW[i.needs_review]})));
   for (const i of items) {
-    if (money(i.cost) == null) actions.push({level: "info", kind: "item", id: i.id, title: `${i.name} has no cost`, detail: "Add a cost so your profit is right"});
+    if (money(i.cost) == null && i.needs_review !== "new") actions.push({level: "info", kind: "item", id: i.id, title: `${i.name} has no cost`, detail: "Add a cost so your profit is right"});
     if (i.status === "Listed" && !i.listed) actions.push({level: "info", kind: "item", id: i.id, title: `${i.name} has no listed date`, detail: "Add it so stale stock can be spotted"});
     if (isSold(i) && (!i.sold || money(i.sale_price) == null)) actions.push({level: "info", kind: "item", id: i.id, title: `${i.name} is sold but missing ${!i.sold ? "the sale date" : "the sale price"}`, detail: "Add it so it counts in your profit"});
   }
@@ -328,7 +333,8 @@ function dashboard({items = [], orders = [], expenses = []}, settings = {}, now 
     return [...m.values()].sort((a, b) => b.profit - a.profit);
   };
 
-  const summary = [];
+  const summary = [], checks = items.filter(i => REVIEW[i.needs_review]).length;
+  if (checks) summary.push(`${checks} eBay sale${checks > 1 ? "s" : ""} to check`);
   if (pending.outForDelivery) summary.push(`${pending.outForDelivery} order${pending.outForDelivery > 1 ? "s" : ""} out for delivery`);
   const stale = actions.filter(a => a.kind === "stale").length;
   if (stale) summary.push(`${stale} listing${stale > 1 ? "s" : ""} past your stale limit`);
@@ -492,8 +498,149 @@ function backupSheets({items = [], orders = [], expenses = []}, settings = {}) {
   ];
 }
 
+/* ---------- eBay sync ---------- */
+// Turns eBay orders (Fulfillment API) and money movements (Finances API) into one row per unit sold.
+// Keeps only the item, price, fees, postage and dates: nothing about the buyer.
+const pennies = v => Math.round(num(v) * 100);
+const amt = a => a && a.value != null ? num(a.value) : 0;
+const londonDay = s => { const d = new Date(s); return isNaN(d) ? null : d.toLocaleDateString("en-CA", {timeZone: "Europe/London"}); };
+// Splits a whole number of pennies by weight; the first share takes any leftover pennies.
+function share(total, weights) {
+  const sum = weights.reduce((t, w) => t + w, 0);
+  const out = weights.map(w => sum ? Math.floor(total * w / sum) : Math.floor(total / weights.length));
+  out[0] += total - out.reduce((t, v) => t + v, 0);
+  return out;
+}
+// Fees and postage labels per eBay order, in pennies, from the Finances API's transactions.
+function ebayMoney(transactions = []) {
+  const by = new Map();
+  for (const t of transactions) {
+    const ref = (t.references || []).find(r => r.referenceType === "ORDER_ID");
+    const id = t.orderId || (ref && ref.referenceId);
+    if (!id) continue;
+    if (!by.has(id)) by.set(id, {sale: false, saleFees: 0, charges: 0, postage: 0, labels: false});
+    const m = by.get(id), sign = t.bookingEntry === "CREDIT" ? -1 : 1;
+    if (t.transactionType === "SALE") { m.sale = true; m.saleFees += pennies(amt(t.totalFeeAmount)); }
+    else if (t.transactionType === "NON_SALE_CHARGE") m.charges += sign * pennies(amt(t.amount)); // e.g. promoted listing fees
+    else if (t.transactionType === "SHIPPING_LABEL") { m.labels = true; m.postage += sign * pennies(amt(t.amount)); }
+  }
+  return by;
+}
+// transactions: null when the Finances API isn't available; fees then come from the order's own fee total.
+// Sale price = item price (after any eBay discount and partial refund) plus the postage the buyer paid.
+function ebaySales(orders = [], transactions = null) {
+  const money = transactions ? ebayMoney(transactions) : null, out = [];
+  for (const o of orders) {
+    const lines = ((o && o.lineItems) || []).filter(l => l && l.lineItemId);
+    if (!o || !o.orderId || !lines.length) continue;
+    const cancelled = (o.cancelStatus && o.cancelStatus.cancelState === "CANCELED") || o.orderPaymentStatus === "FULLY_REFUNDED";
+    const m = money && money.get(o.orderId);
+    const weights = lines.map(l => Math.max(1, pennies(amt(l.lineItemCost))));
+    const fees = share(Math.max(0, (m && m.sale ? m.saleFees : pennies(amt(o.totalMarketplaceFee))) + (m ? m.charges : 0)), weights);
+    const postage = m && m.labels ? share(Math.max(0, m.postage), weights) : null;
+    lines.forEach((l, li) => {
+      const qty = Math.max(1, Math.min(50, Math.round(num(l.quantity) || 1))), even = Array(qty).fill(1);
+      const discount = (l.appliedPromotions || []).reduce((t, p) => t + pennies(amt(p.discountAmount)), 0);
+      const refunded = (l.refunds || []).reduce((t, r) => t + pennies(amt(r.amount)), 0);
+      const itemOnly = Math.max(0, pennies(amt(l.lineItemCost)) - discount);
+      const price = Math.max(0, itemOnly + pennies(amt(l.deliveryCost && l.deliveryCost.shippingCost)) - refunded);
+      const prices = share(price, even), items = share(itemOnly, even), lf = share(fees[li], even), lp = postage && share(postage[li], even);
+      for (let u = 0; u < qty; u++) out.push({
+        ref: `ebay:${o.orderId}:${l.lineItemId}:${u + 1}`, title: String(l.title || "").trim().slice(0, 300) || "eBay sale", sku: String(l.sku || "").trim(),
+        sold: londonDay(o.creationDate), sale_price: prices[u] / 100, item_price: items[u] / 100, fees: lf[u] / 100, postage: lp ? lp[u] / 100 : null,
+        posted: l.lineItemFulfillmentStatus === "FULFILLED" || o.orderFulfillmentStatus === "FULFILLED",
+        cancelled: !!cancelled || (refunded > 0 && price === 0),
+      });
+    });
+  }
+  return out;
+}
+
+// How much of a stock item's name appears in an eBay title (0 to 1). A size that doesn't appear halves it.
+const FILLER = new Set(["the", "and", "a", "an", "with", "for", "of", "new", "brand", "bnib", "bnwt", "uk", "eu", "us", "size", "in", "box", "sealed", "free", "postage", "p&p", "x"]);
+const words = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+  .split(/[^a-z0-9.&]+/).map(w => w.replace(/^[.&]+|[.&]+$/g, "")).filter(w => w && !FILLER.has(w));
+function nameScore(title, item) {
+  const t = new Set(words(title)), n = [...new Set(words(item.name))], sz = [...new Set(words(item.size))];
+  if (!n.length) return 0;
+  const s = n.filter(w => t.has(w)).length / n.length;
+  return sz.length && !sz.every(w => t.has(w)) ? s / 2 : s;
+}
+
+// What a sync should change in your tracker. items: your rows; units: from ebaySales().
+// 1. Already synced: update price, fees, postage and posted. A cancelled sale is undone.
+// 2. Already recorded as an eBay sale (by hand or from an old spreadsheet): linked, not added.
+// 3. Unsold stock: a matching SKU (custom label) is sure; otherwise the clearly best name match, marked to check.
+// 4. No match: a new sold item with no cost, marked to check.
+function planEbaySync(items = [], units = []) {
+  const plan = {inserts: [], updates: [], deletes: [], counts: {added: 0, matched: 0, linked: 0, updated: 0, undone: 0, review: 0}};
+  const byRef = new Map(items.filter(i => i.source_ref).map(i => [i.source_ref, i]));
+  const used = new Set(), c = plan.counts;
+  const days = (a, b) => Math.abs(Date.parse(a) - Date.parse(b)) / DAY;
+  const differs = (a, b) => Math.abs((money(a) || 0) - (money(b) || 0)) >= 0.005;
+  const keyOf = i => nameKey(i.name) + "|" + nameKey(i.size);
+  const firstPick = (a, b) => (a.status === "Listed" ? 0 : 1) - (b.status === "Listed" ? 0 : 1) || String(a.bought || "9999").localeCompare(String(b.bought || "9999")) || String(a.created_at || "").localeCompare(String(b.created_at || ""));
+  const update = (i, patch) => { if (Object.keys(patch).length) plan.updates.push({id: i.id, patch}); };
+  const units2 = [...units].sort((a, b) => String(a.sold).localeCompare(String(b.sold)) || a.ref.localeCompare(b.ref));
+  for (const u of units2) {
+    const had = byRef.get(u.ref);
+    if (had) {
+      used.add(had.id);
+      if (u.cancelled) {
+        if (had.prev_status === "Sold") { if (had.needs_review !== "cancelled") { update(had, {needs_review: "cancelled"}); c.review++; } continue; }
+        // Stock it was matched to goes back to stock, and so does an added item you've since given a cost (a return).
+        const back = had.prev_status || (money(had.cost) != null && had.needs_review !== "new" ? "In stock" : null);
+        if (back) update(had, {status: back, platform: "", sold: null, sale_price: null, fees: 0, postage: 0, posted: false, source: "", source_ref: null, source_title: null, prev_status: null, needs_review: null});
+        else plan.deletes.push(had.id);
+        c.undone++;
+        continue;
+      }
+      if (had.status !== "Sold") continue; // you've changed it yourself since
+      const patch = {}, mine = had.prev_status === "Sold"; // a sale you recorded yourself keeps your own figures
+      if (!mine && differs(had.sale_price, u.sale_price)) patch.sale_price = u.sale_price;
+      if (mine ? !money(had.fees) && u.fees : differs(had.fees, u.fees)) patch.fees = u.fees;
+      if (u.postage != null && (mine ? !money(had.postage) && u.postage : differs(had.postage, u.postage))) patch.postage = u.postage;
+      if (u.posted && !had.posted) patch.posted = true;
+      if (Object.keys(patch).length) { update(had, patch); c.updated++; }
+      continue;
+    }
+    if (u.cancelled) continue;
+    const link = {source: "ebay", source_ref: u.ref, source_title: u.title};
+    const sale = {status: "Sold", platform: "eBay", sold: u.sold, sale_price: u.sale_price, fees: u.fees, postage: u.postage ?? 0, posted: u.posted, ...link};
+    const near = (p, v) => p != null && Math.abs(p - v) <= 0.5;
+    const prior = items.filter(i => !used.has(i.id) && !i.source_ref && isSold(i) && nameKey(i.platform) === "ebay" && i.sold && u.sold && days(i.sold, u.sold) <= 2
+        && (near(money(i.sale_price), u.sale_price) || near(money(i.sale_price), u.item_price)))
+      .map(i => ({i, s: nameScore(u.title, i)})).filter(x => x.s >= 0.5).sort((a, b) => b.s - a.s || days(a.i.sold, u.sold) - days(b.i.sold, u.sold))[0];
+    if (prior) {
+      const i = prior.i; used.add(i.id);
+      update(i, {...link, prev_status: "Sold", ...(!money(i.fees) && u.fees ? {fees: u.fees} : {}), ...(!money(i.postage) && u.postage ? {postage: u.postage} : {}), ...(u.posted && !i.posted ? {posted: true} : {})});
+      c.linked++;
+      continue;
+    }
+    const open = items.filter(i => !used.has(i.id) && !i.source_ref && (i.status === "In stock" || i.status === "Listed"));
+    const sku = nameKey(u.sku);
+    let pick = sku && open.filter(i => [i.import_id, i.id].some(v => v && nameKey(v) === sku)).sort(firstPick)[0], guess = false;
+    if (!pick) {
+      const cands = open.map(i => ({i, s: nameScore(u.title, i), k: keyOf(i)})).filter(x => x.s >= 0.6).sort((a, b) => b.s - a.s);
+      const top = cands[0];
+      // Only when it's clearly the best: two different items scoring about the same is a guess too far.
+      if (top && !cands.some(x => x.k !== top.k && x.s > top.s - 0.15)) { pick = cands.filter(x => x.k === top.k).map(x => x.i).sort(firstPick)[0]; guess = true; }
+    }
+    if (pick) {
+      used.add(pick.id);
+      update(pick, {...sale, prev_status: pick.status, needs_review: guess ? "match" : null});
+      c.matched++; if (guess) c.review++;
+      continue;
+    }
+    plan.inserts.push({name: u.title, category: "", size: "", cost: null, ...sale, prev_status: null, needs_review: "new"});
+    c.added++; c.review++;
+  }
+  return plan;
+}
+
 const RHQ = {esc, gbp, DAY, taxYear, looseJson, parseDate, num, splitLine, tableFrom, pick, normInventory, normExpenses, crunch,
   ORDER_STATUSES, ON_THE_WAY, PERIODS, isPreorder, orderLabel, orderStep, nextStatus, orderCounts, orderFilter, orderMatches, saleProfit, expenseDates, chartSeries, dashboard,
-  trackerToCrunch, itemAge, itemFilter, itemMatches, SALE_PERIODS, salesView, expenseRows, parseImport, planImport, backupSheets};
+  trackerToCrunch, itemAge, itemFilter, itemMatches, SALE_PERIODS, salesView, expenseRows, parseImport, planImport, backupSheets,
+  ebaySales, nameScore, planEbaySync};
 if (typeof module === "object" && module.exports) module.exports = RHQ; else root.RHQ = RHQ;
 })(typeof self !== "undefined" ? self : this);

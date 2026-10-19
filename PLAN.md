@@ -1,6 +1,6 @@
 # Reselling HQ: build plan
 
-Status: Stages 1 and 2 are done. Stage 3 is built and confirmed on the preview; last check is signing in on the live app after merging. Stage 4 (built-in tracker and new look) is built and waiting for your check on the preview; next is Stage 5 (eBay). The stage order changed on 18 October 2026, see section 2.
+Status: Stages 1 and 2 are done. Stage 3 is built and confirmed on the preview; last check is signing in on the live app after merging. Stage 4 (built-in tracker and new look) is built and waiting for your check on the preview. Stage 5 (eBay) is built and tested with a pretend eBay; next is trying it on the eBay sandbox, then your own eBay account. The stage order changed on 18 October 2026, see section 2.
 All prices are rough guides from October 2026 at about $1 = £0.78. Check the live pricing pages before you rely on them. Tax and money figures are guides, not advice.
 
 ## Things to do now (before Stage 2)
@@ -152,6 +152,40 @@ Done when: you can add orders, move them into stock, sell items and log expenses
 - eBay's sign-in needs a fixed web address to return to, so eBay connects on your live address (still locked to the allow list).
 
 Done when: a sandbox account's sales, fees and postage import correctly with no duplicates on re-sync, disconnecting removes the tokens and data, the deletion endpoint passes eBay's check, and your own eBay sales arrive in the tracker.
+
+Your choices (19 October 2026): **Disconnect keeps your sales** (it forgets the eBay sign-in and eBay's order numbers only), and **the first sync goes back to 6 April** (start of the tax year).
+
+Built (19 October 2026), waiting for the sandbox and real-account checks:
+- **Database** (`supabase/migrations/003_ebay.sql`): `ebay_connections` (encrypted tokens, server only: the app on your phone can't read it), the app's signing key (server only), and new item columns so each eBay sale is stored once (a unique rule in the database itself).
+- **Server:**
+  - `api/ebay.js`: connect, the sign-in return, status, Sync now, Disconnect and the daily job.
+  - `api/_ebay.js`: tokens encrypted with AES-256-GCM; a signed 10-minute sign-in "state"; eBay's digital signatures for the Finances API.
+  - `api/ebay-deletion.js`: eBay's account-deletion address (challenge answer and signature check).
+  - `vercel.json`: the daily sync, early morning.
+- **Matching** (`js/core.js`), for each item sold in an eBay order:
+  1. Already synced: update fees, postage and posted.
+  2. Already in your sales as an eBay sale (e.g. from your old spreadsheet): linked, keeping your own figures.
+  3. Your stock: a matching custom label (SKU) is sure; otherwise only a clearly-best name match, marked **Check**.
+  4. Otherwise: a new sale with no cost, marked **Check**.
+  - A cancelled or fully refunded order undoes the sale.
+- **Money:** sale price = item price plus postage the buyer paid, less discounts and partial refunds. Fees from the Finances API (with promoted listing fees), or the order's fee total if that's unavailable. Postage = labels bought on eBay; postage you type stays when eBay has none.
+- **Screens** (`js/ebay.js`):
+  - The eBay card in Settings.
+  - The **Check eBay sale** pop-up: confirm, pick the right stock item, or keep it as its own item with a cost.
+  - A **To check** filter on Sales, and these sales first in Needs action.
+  - The app syncs on opening if the last sync was over 12 hours ago.
+- `privacy.html`: the short "private app, used only by its owner" page.
+- `/api/health` reports `ebay`.
+- **Tests (all passing):** 174 unit tests and 102 browser tests (phone light, phone dark and desktop). The new ones cover:
+  - Matching, money and cancels.
+  - A full sync against a pretend eBay, including signed Finances calls, then a re-sync that adds nothing.
+  - Token refresh and "connect again".
+  - Two syncs at once, disconnect and reconnect without doubling up.
+  - The deletion challenge and signature, and the daily job's secret.
+  - Database rules in a real Postgres.
+  - The screens.
+- **Not tested yet:** real eBay (sandbox and production), eBay's acceptance of our Finances signatures for UK sellers, the daily job on Vercel, and eBay's live check of the deletion address.
+- **To check on the sandbox:** whether eBay hands over orders older than 90 days (its docs disagree).
 
 ### Stage 6: Vinted sync without Google approval (your account first)
 - **Your own domain:** you already own one, so we use it with subdomains (for example `in.` for incoming sale emails and later `mail.` for sending), rather than buying a new one. You tell me the domain and where it's registered at the start of this stage, and I give click-by-click steps for the email routing on it.
@@ -326,7 +360,7 @@ Notes:
 - [x] Stage 2: Foundations
 - [ ] Stage 3: Accounts and private data (only you). Confirmed on the preview; tick once sign-in works on the live app
 - [ ] Stage 4: Built-in tracker and new look. Built; tick once you've checked it on the preview and merged
-- [ ] Stage 5: eBay sync for your account
+- [ ] Stage 5: eBay sync for your account. Built; tick once the sandbox works and your own eBay sales arrive
 - [ ] Stage 6: Vinted sales and retailer order emails via email forwarding on your own domain, plus manual entry
 - [ ] Stage 7: Claude usage limits
 - [ ] Stage 8: Privacy policy, terms, ICO, own-domain emails, automatic weekly backup (beta can start after this)

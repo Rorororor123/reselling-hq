@@ -17,7 +17,8 @@ function niceDate(v, now = new Date()) {
 }
 const plural = (n, w) => n + " " + w + (n === 1 ? "" : "s");
 const PILL = {"Ordered": "s-ordered", "Shipped": "s-shipped", "Out for delivery": "s-ofd", "Delivered": "s-done", "Cancelled": "s-cancel", "Pre-order": "s-pre", "Sold": "s-sold",
-  "In stock": "s-ordered", "Listed": "s-shipped", "Stale": "s-cancel", "To post": "s-pre", "Monthly": "s-shipped", "Yearly": "s-shipped", "One-off": "s-ordered", "Ended": "s-ordered"};
+  "In stock": "s-ordered", "Listed": "s-shipped", "Stale": "s-cancel", "To post": "s-pre", "Monthly": "s-shipped", "Yearly": "s-shipped", "One-off": "s-ordered", "Ended": "s-ordered",
+  "Check": "s-pre", "Connected": "s-done"};
 const pill = status => `<span class="pill ${PILL[status] || "s-ordered"}">${esc(status)}</span>`;
 function toast(text) {
   let el = $("#toast");
@@ -177,6 +178,7 @@ $("#dashOut").addEventListener("click", e => {
     if (act.kind === "stale" || act.kind === "item") { const i = T.items.find(x => x.id === act.id); if (i && api.openItem) api.openItem(i); }
     if (act.kind === "post") app.go("sales", {filter: "toPost"});
     if (act.kind === "backup") app.go("set");
+    if (act.kind === "review") { const i = T.items.find(x => x.id === act.id); if (i && api.openReview) api.openReview(i); }
   }
 });
 
@@ -376,5 +378,5 @@ form.querySelector("[data-delete]").addEventListener("click", async () => {
 
 // Shared with js/stock.js and the weekly check in js/app.js.
 const api = window.RHQTracker = {data: T, reload: load, ready: app.ready.then(load), renderAll, onRender: f => renderers.push(f),
-  toast, niceDate, pill, plural, iso, whole, problem, openItem: null};
+  toast, niceDate, pill, plural, iso, whole, problem, openItem: null, openReview: null};
 })();

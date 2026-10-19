@@ -187,11 +187,14 @@ const SALE_FILTERS = [["month", "This month"], ["30d", "30 days"], ["ty", "Tax y
 function renderSales() {
   const list = $("#saleList"), now = new Date();
   if (!T.loaded) { $("#saleStats").innerHTML = $("#saleFilters").innerHTML = ""; return loading(list, "sales"); }
-  const v = R.salesView(T.items, saleFilter === "toPost" ? {toPost: true} : {period: saleFilter, platform: salePlat}, now);
+  const checkN = T.items.filter(i => i.status === "Sold" && i.needs_review).length;
+  if (saleFilter === "check" && !checkN) saleFilter = "month";
+  const v = R.salesView(T.items, saleFilter === "toPost" ? {toPost: true} : {period: saleFilter === "check" ? "all" : saleFilter, platform: salePlat}, now);
+  if (saleFilter === "check") v.rows = v.rows.filter(r => r.needs_review);
   const t = v.totals;
   $("#saleStats").innerHTML = stat("Sales", t.count) + stat("Revenue", whole(t.revenue)) + stat("Profit", `<span class="${t.profit < 0 ? "neg" : "pos"}">${whole(t.profit)}</span>`)
     + stat("Fees + postage", whole(t.fees + t.postage)) + stat("To post", v.toPost, v.toPost ? "warn" : "");
-  $("#saleFilters").innerHTML = chips(SALE_FILTERS, saleFilter, {toPost: v.toPost});
+  $("#saleFilters").innerHTML = chips(checkN ? [...SALE_FILTERS, ["check", "To check"]] : SALE_FILTERS, saleFilter, {toPost: v.toPost, check: checkN});
   const sel = $("#salePlatform");
   if (salePlat && !v.platforms.includes(salePlat)) salePlat = "";
   sel.innerHTML = '<option value="">All platforms</option>' + v.platforms.map(p => `<option${p === salePlat ? " selected" : ""}>${esc(p)}</option>`).join("");
@@ -199,13 +202,13 @@ function renderSales() {
   if (!T.items.some(i => i.status === "Sold")) { list.innerHTML = '<div class="card"><p class="empty">No sales yet. Tap <b>Record a sale</b> when something sells, or <b>Mark as sold</b> on the Inventory screen.</p></div>'; return; }
   if (!v.rows.length) { list.innerHTML = `<div class="card"><p class="empty">${saleFilter === "toPost" ? "Everything's posted." : "No sales in this period."}</p></div>`; return; }
   list.innerHTML = v.rows.map(r => {
-    const meta = [r.platform, r.sold ? niceDate(r.sold, now) : "no sale date", r.category].filter(Boolean).join(" · ");
+    const meta = [r.source === "ebay" ? r.platform + " (synced)" : r.platform, r.sold ? niceDate(r.sold, now) : "no sale date", r.category].filter(Boolean).join(" · ");
     const parts = [`Sold for ${gbp(money(r.sale_price))}`, money(r.cost) != null ? `cost ${gbp(money(r.cost))}` : "no cost entered", money(r.fees) ? `fees ${gbp(money(r.fees))}` : "", money(r.postage) ? `postage ${gbp(money(r.postage))}` : ""].filter(Boolean).join(" · ");
     return `<article class="ocard" tabindex="0" data-sale="${esc(r.id)}" aria-label="${esc(r.name)}, sold. Open to edit">
       <div class="ico"><svg class="i"><use href="#i-tag"/></svg></div>
       <div class="who"><b>${esc(r.name)}${r.size ? ` <span class="sub">${esc(r.size)}</span>` : ""}</b><span>${esc(meta)}</span></div>
       <div class="prog"><small>${esc(parts)}</small></div>
-      <div class="end">${pill(r.posted ? "Sold" : "To post")}<span class="mono ${r.profit < 0 ? "neg" : "pos"}">${gbp(r.profit)}</span>
+      <div class="end">${pill(r.needs_review ? "Check" : r.posted ? "Sold" : "To post")}<span class="mono ${r.profit < 0 ? "neg" : "pos"}">${gbp(r.profit)}</span>
         ${r.posted ? "" : `<div class="acts"><button class="btn small primary" type="button" data-posted="${esc(r.id)}">Mark posted</button></div>`}</div></article>`;
   }).join("");
 }
@@ -220,9 +223,11 @@ $("#saleList").addEventListener("click", async e => {
     return;
   }
   const c = e.target.closest("[data-sale]");
-  if (c && !e.target.closest("button,a")) { const i = findItem(c.dataset.sale); if (i) openItem(i); }
+  if (c && !e.target.closest("button,a")) { const i = findItem(c.dataset.sale); if (i) openSaleCard(i); }
 });
-cardKeys($("#saleList"), "data-sale", findItem, i => openItem(i));
+// An eBay sale the sync wasn't sure about opens the check first (js/ebay.js).
+const openSaleCard = i => i.needs_review && tr.openReview ? tr.openReview(i) : openItem(i);
+cardKeys($("#saleList"), "data-sale", findItem, openSaleCard);
 
 /* ---------- expenses ---------- */
 const REPEAT = {once: "One-off", monthly: "Monthly", yearly: "Yearly"};

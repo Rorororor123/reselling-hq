@@ -295,6 +295,10 @@
     </div>
     <p class="sub" id="accMsg" role="status" style="margin:10px 0 0"></p>
   </div>
+  <div class="card" id="ebayCard">
+    <div class="cardhead"><h3>eBay</h3><span id="ebayTag"></span></div>
+    <div id="ebayOut" aria-live="polite"><p class="sub" style="margin:0">Checking your eBay connection…</p></div>
+  </div>
   <div class="card">
   <form class="tool" id="setForm">
     <h3>Monthly goal</h3>
@@ -462,6 +466,13 @@
   </form>
 </dialog>
 
+<dialog class="sheet" id="reviewSheet" aria-labelledby="reviewTitle">
+  <form method="dialog" id="reviewForm" novalidate>
+    <div class="sheethead"><h3 id="reviewTitle">Check eBay sale</h3><button class="x" type="button" data-close aria-label="Close">×</button></div>
+    <div class="sheetbody" id="reviewBody"></div>
+  </form>
+</dialog>
+
 <dialog class="sheet" id="expSheet" aria-labelledby="expTitle">
   <form method="dialog" id="expForm" novalidate>
     <div class="sheethead"><h3 id="expTitle">Add expense</h3><button class="x" type="button" data-close aria-label="Close">×</button></div>
@@ -519,6 +530,7 @@
 <script src="/js/xlsx.js"></script>
 <script src="/js/tracker.js"></script>
 <script src="/js/stock.js"></script>
+<script src="/js/ebay.js"></script>
 
 </body>
 </html>

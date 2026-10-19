@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy: Reselling HQ</title>
+<link rel="icon" href="/icon-192.png">
+<link rel="stylesheet" href="/css/styles.css">
+<style>
+  main{max-width:720px;margin:0 auto;padding:32px 16px 48px}
+  h1{font-family:var(--display);font-weight:800;font-size:30px;letter-spacing:-.01em;margin:0 0 6px}
+  h2{font-family:var(--display);font-weight:600;font-size:19px;margin:28px 0 8px}
+  p,li{color:var(--ink)} .sub{color:var(--muted)} a{color:var(--accent-text)}
+  ul{padding-left:20px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Privacy</h1>
+  <p class="sub">Reselling HQ · last updated 19 October 2026</p>
+
+  <p><b>Reselling HQ is a private app used only by its owner</b>, a UK reseller, to keep track of their own stock and sales. It is not open to the public. Nobody else can sign up: sign-in is limited to an allow list. A full privacy policy will be published here before anyone else is invited.</p>
+
+  <h2>What it stores</h2>
+  <ul>
+    <li>The owner's sign-in email, settings, stock, orders, expenses, sales and saved weekly reports.</li>
+    <li>From eBay (only when the owner connects their own eBay account): for each item sold, the item title, quantity, sale price, eBay fees, postage labels, dates and the eBay order number. <b>No buyer names, usernames, addresses or contact details are stored.</b></li>
+    <li>The eBay sign-in tokens, encrypted (AES-256-GCM), so the app can bring in new sales once a day. The app never sees the owner's eBay password; signing in happens on eBay's own website.</li>
+  </ul>
+
+  <h2>What it's used for</h2>
+  <p>Only to show the owner their own profit, stock and sales. The data is never sold, shared or used for advertising. eBay data is used only for the benefit of the eBay seller it belongs to.</p>
+
+  <h2>Where it's kept</h2>
+  <p>In a Supabase database (London region) with rules that only let the signed-in owner see their own data, and on Vercel, which hosts the app. Claude (Anthropic) is used for the weekly advice, listing writer and buyer replies; when the owner runs a weekly check, a summary of their own figures is sent (which can include item names and prices, never buyer details).</p>
+
+  <h2>Disconnecting and deleting</h2>
+  <ul>
+    <li><b>Disconnect eBay</b> (in Settings) deletes the eBay tokens and eBay order numbers straight away. The owner can also remove access on eBay: Account settings, then Third-party app permissions.</li>
+    <li>If an eBay user closes their eBay account, eBay tells the app and that account's eBay data is deleted.</li>
+    <li><b>Delete my account</b> (in Settings) deletes everything.</li>
+  </ul>
+
+  <h2>Contact</h2>
+  <p>Questions: email the owner using the address on their eBay seller profile.</p>
+  <p><a href="/">Back to Reselling HQ</a></p>
+</main>
+</body>
+</html>
