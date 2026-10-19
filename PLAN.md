@@ -1,6 +1,6 @@
 # Reselling HQ: build plan
 
-Status: Stages 1 and 2 are done. Stage 3 is built and confirmed on the preview; last check is signing in on the live app after merging. Stage 4 (built-in tracker and new look) is built and waiting for your check on the preview; next is Stage 5 (eBay). The stage order changed on 18 October 2026, see section 2.
+Status: Stages 1 to 4 are done and working on the live app (19 October 2026). Next up: Stage 5 (eBay sync). The stage order changed on 18 October 2026, see section 2.
 All prices are rough guides from October 2026 at about $1 = £0.78. Check the live pricing pages before you rely on them. Tax and money figures are guides, not advice.
 
 ## Things to do now (before Stage 2)
@@ -93,7 +93,7 @@ Finished (18 October 2026): `index.html` is now `index.html` + `css/styles.css` 
 
 Done when: two test accounts (both yours) can't see each other's data (proven by an automated test), settings follow you between phone and laptop, deleting an account removes all its rows, and anyone not on the allow list is refused.
 
-Built (18 October 2026). Confirmed on the preview (19 October): sign-in works, a second test account saw none of your data and deleting it removed it, and the Supabase settings are ticked for Production too. Last check: sign in on the live app after merging. What was built: `supabase/migrations/001_accounts.sql` (tables, security rules, allow list, sign-up check), `js/account.js` (sign-in screen, settings and reports in your account, move old data, download, delete), `api/_supabase.js` (every server function checks the sign-in and the allow list), `api/account.js` (delete), `api/config.js`. 72 unit tests (including 11 that run the real security rules in a test database and prove one account can't see, change or delete another's rows) and 42 browser tests (phone light/dark and desktop, against a pretend Supabase) pass. `/api/health` now also reports `accounts`. `APP_PASSWORD` is no longer used; delete it from Vercel only once sign-in works on the live app.
+Built (18 October 2026). Confirmed on the preview (19 October): sign-in works, a second test account saw none of your data and deleting it removed it, and the Supabase settings are ticked for Production too. Done: sign-in works on the live app (19 October). What was built: `supabase/migrations/001_accounts.sql` (tables, security rules, allow list, sign-up check), `js/account.js` (sign-in screen, settings and reports in your account, move old data, download, delete), `api/_supabase.js` (every server function checks the sign-in and the allow list), `api/account.js` (delete), `api/config.js`. 72 unit tests (including 11 that run the real security rules in a test database and prove one account can't see, change or delete another's rows) and 42 browser tests (phone light/dark and desktop, against a pretend Supabase) pass. `/api/health` now also reports `accounts`. `APP_PASSWORD` is no longer used, and sign-in now works on the live app, so it can be deleted from Vercel.
 
 ### Stage 4: Built-in tracker and new look (only you use the app)
 Redefined on 19 October 2026: **no spreadsheets.** Everything is managed inside the app with screens, forms and cards. The look and layout follow the design files in `design/` (`Main.dc.html`, `Orders.dc.html`, `Phone.dc.html`): black and purple, Bricolage Grotesque headings, Figtree text, IBM Plex Mono numbers, with a matching light mode. The teal and yellow theme is replaced everywhere. The numbers in the design files are examples only; the app shows your own data. Our own original design, not copied from any other app.
@@ -121,7 +121,7 @@ Built in two halves, with a preview after each:
 1. First half: this plan update, design files moved into `design/`, the database file, the dashboard maths, the new look, the Dashboard and the Orders screen.
 2. Second half: Inventory, Sales, Expenses, the full quick add, Settings changes, the weekly check reading from the tracker, then the optional extras if they stay small.
 
-Built (19 October 2026), both halves. Waiting for your check on the preview.
+Done (19 October 2026): merged and working on the live app, both halves.
 - **First half:**
   - `supabase/migrations/002_tracker.sql`: orders, items and expenses tables, plus "move into stock" done in one step.
   - The Dashboard and the Orders screen (`js/tracker.js`), and the dashboard maths (`js/core.js`).
@@ -324,8 +324,8 @@ Notes:
 ## Progress
 - [x] Stage 1: Plan
 - [x] Stage 2: Foundations
-- [ ] Stage 3: Accounts and private data (only you). Confirmed on the preview; tick once sign-in works on the live app
-- [ ] Stage 4: Built-in tracker and new look. Built; tick once you've checked it on the preview and merged
+- [x] Stage 3: Accounts and private data (only you)
+- [x] Stage 4: Built-in tracker and new look
 - [ ] Stage 5: eBay sync for your account
 - [ ] Stage 6: Vinted sales and retailer order emails via email forwarding on your own domain, plus manual entry
 - [ ] Stage 7: Claude usage limits
