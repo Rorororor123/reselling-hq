@@ -1,6 +1,6 @@
 // Reselling HQ: open /api/health to check the server's settings. Shows which settings exist, never their values.
 const { projectUrl } = require("./_supabase");
-const NAMES = ["ANTHROPIC_API_KEY", "APP_PASSWORD", "SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY"];
+const NAMES = ["ANTHROPIC_API_KEY", "SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY"];
 // Public Supabase Auth addresses that answer with just the publishable key (sent as the apikey header).
 const CHECKS = ["/auth/v1/health", "/auth/v1/settings"];
 

@@ -43,7 +43,7 @@ beforeAll(async () => {
   await as(B, "insert into public.settings (user_id, data) values ($1, '{\"budget\": 222}')", [B]);
   await as(A, "insert into public.reports (id, ts, data) values ('r1', 1, '{\"who\": \"A\"}')");
   await as(B, "insert into public.reports (id, ts, data) values ('r1', 1, '{\"who\": \"B\"}')");
-});
+}, 60000); // starting the test database can take over 10 seconds on a slow or just-started machine
 
 describe("row level security", () => {
   it("each person sees only their own settings and reports", async () => {
