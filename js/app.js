@@ -19,15 +19,37 @@ $("#setForm").addEventListener("submit", async e => {
   setTimeout(() => $("#setMsg").textContent = "", 2000);
 });
 
-/* ---------- tabs ---------- */
-function go(tab) {
-  document.querySelectorAll("nav.menu button").forEach(x => x.dataset.tab === tab ? x.setAttribute("aria-current", "page") : x.removeAttribute("aria-current"));
+/* ---------- screens ---------- */
+// Any button with data-tab opens that screen (sidebar, phone tab bar, the More sheet, links in cards).
+// data-filter picks a starting filter, e.g. Pre-orders opens Orders filtered to pre-orders.
+const showHooks = {};
+let current = "dash";
+function go(tab, opts = {}) {
+  current = tab;
+  const filter = opts.filter || "";
+  document.querySelectorAll("nav.menu button[data-tab], nav.tabbar button[data-tab]").forEach(x => {
+    const on = x.dataset.tab === tab && (x.dataset.filter || "") === filter;
+    on ? x.setAttribute("aria-current", "page") : x.removeAttribute("aria-current");
+  });
+  const more = document.querySelector('nav.tabbar [data-sheet="moreSheet"]');
+  const inBar = document.querySelector(`nav.tabbar button[data-tab="${tab}"]:not([data-filter])`);
+  !inBar ? more.setAttribute("aria-current", "page") : more.removeAttribute("aria-current");
   document.querySelectorAll("section.tab").forEach(s => s.hidden = s.id !== tab);
+  document.querySelectorAll("dialog[open]").forEach(d => d.close());
   if (tab === "hist") loadHistory();
+  if (showHooks[tab]) showHooks[tab](opts);
   window.scrollTo({top: 0});
 }
-document.querySelectorAll("nav.menu button").forEach(b => b.addEventListener("click", () => go(b.dataset.tab)));
-document.querySelectorAll("[data-go]").forEach(b => b.addEventListener("click", () => go(b.dataset.go)));
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-tab]");
+  if (t) { e.preventDefault(); go(t.dataset.tab, {filter: t.dataset.filter}); return; }
+  const sh = e.target.closest("[data-sheet]");
+  if (sh) { document.getElementById(sh.dataset.sheet).showModal(); return; }
+  const x = e.target.closest("[data-close]");
+  if (x) x.closest("dialog").close();
+});
+// Tapping the dark area around a pop-up closes it.
+document.querySelectorAll("dialog.sheet").forEach(d => d.addEventListener("click", e => { if (e.target === d) d.close(); }));
 
 /* ---------- tax year ---------- */
 const TY = taxYear();
@@ -320,7 +342,7 @@ async function loadHistory() {
     }).join("");
     box.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
       const r = histCache[+b.dataset.i]; renderReport({nums: r.nums, ai: r.ai});
-      go("home");
+      go("check");
       setStatus("Showing the report from " + new Date(r.ts).toLocaleDateString("en-GB") + ".");
     }));
   } catch { box.innerHTML = '<div class="banner">Couldn\'t load your history just now. Try again in a moment.</div>'; }
@@ -397,4 +419,13 @@ async function copy(text, btn) {
 }
 $("#listCopy").addEventListener("click", e => copy($("#listOut").textContent, e.currentTarget));
 $("#rCopy").addEventListener("click", e => copy($("#rOut").textContent.split(/\n\s*Note:/)[0].trim(), e.currentTarget));
+
+/* ---------- for js/tracker.js ---------- */
+window.RHQApp = {
+  go, ready: capsReady, onShow: (tab, fn) => { showHooks[tab] = fn; },
+  isShowing: tab => current === tab,
+  settings: () => S,
+  // Saves some settings (goal, dashboard boxes...) into the account alongside the rest.
+  async save(patch) { Object.assign(S, patch); await saveAll(); },
+};
 })();

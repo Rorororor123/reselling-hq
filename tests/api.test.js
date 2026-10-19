@@ -362,7 +362,7 @@ describe("sw.js", () => {
     const shell = JSON.parse(src.match(/const SHELL = (\[.*?\]);/)[1]);
     expect(shell).toEqual(expect.arrayContaining(["/css/styles.css", "/js/core.js", "/js/app.js"]));
     for (const p of shell) if (p !== "/") expect(fs.existsSync(new URL(".." + p, import.meta.url)), p).toBe(true);
-    expect(shell).toEqual(expect.arrayContaining(["/js/account.js", "/js/vendor/supabase-2.117.2.js"]));
-    expect(src).toContain('const CACHE = "rhq-v3"');
+    expect(shell).toEqual(expect.arrayContaining(["/js/account.js", "/js/tracker.js", "/js/vendor/supabase-2.117.2.js"]));
+    expect(src).toContain('const CACHE = "rhq-v4"');
   });
 });

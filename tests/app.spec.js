@@ -14,6 +14,14 @@ const analysis = {
 };
 
 const visible = (page, sel) => page.locator(sel).filter({ visible: true }).first();
+// Opens a screen the way a person would: the sidebar on a computer, the tab bar (or More) on a phone.
+async function openTab(page, tab, filter) {
+  const sel = `[data-tab="${tab}"]` + (filter ? `[data-filter="${filter}"]` : ":not([data-filter])");
+  const direct = page.locator(`nav.menu ${sel}, nav.tabbar ${sel}, .mobilebar ${sel}, .railfoot ${sel}`).filter({ visible: true });
+  if (await direct.count()) await direct.first().click();
+  else { await page.click('nav.tabbar [data-sheet="moreSheet"]'); await page.click(`#moreSheet ${sel}`); }
+  await expect(page.locator("#" + tab)).toBeVisible();
+}
 
 test.beforeEach(async ({ page }) => {
   page.errors = [];
@@ -27,13 +35,14 @@ test("every screen opens", async ({ page }) => {
   await useFakeSupabase(page);
   await page.goto("/");
   await expect(page.locator("#taxyr")).toHaveText("UK tax year 2026/27");
-  await expect(page.locator("#home")).toBeVisible();
-  for (const tab of ["list", "reply", "hist", "help", "home"]) {
-    await visible(page, `nav.menu button[data-tab="${tab}"]`).click();
-    await expect(page.locator("#" + tab)).toBeVisible();
+  await expect(page.locator("#dash")).toBeVisible();
+  for (const tab of ["orders", "check", "list", "reply", "hist", "help", "set", "dash"]) {
+    await openTab(page, tab);
+    const wide = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    expect(wide, tab + " sticks out sideways").toBe(false);
   }
-  await visible(page, '[data-go="set"]').click();
-  await expect(page.locator("#set")).toBeVisible();
+  await openTab(page, "orders", "preorders");
+  await expect(page.locator('#ordFilters [aria-pressed="true"]')).toContainText("Pre-orders");
   // Nothing should stick out sideways on a phone.
   const wide = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   expect(wide).toBe(false);
@@ -49,6 +58,7 @@ test("weekly check from CSV files with Claude's advice", async ({ page }) => {
   });
   await page.goto("/");
 
+  await openTab(page, "check");
   await page.setInputFiles("#csvIn", fixtures);
   await expect(page.locator("#status")).toContainText("2 CSV files ready");
   await page.click("#runBtn");
@@ -67,7 +77,7 @@ test("weekly check from CSV files with Claude's advice", async ({ page }) => {
   await expect(page.locator('#steps li[data-s="done"]')).toHaveCount(4);
 
   // The report is saved and shows in History.
-  await visible(page, 'nav.menu button[data-tab="hist"]').click();
+  await openTab(page, "hist");
   await expect(page.locator("#histList button")).toHaveCount(1);
   await expect(page.locator("#histList")).toContainText("7-day profit £23.00");
   // ...and it's saved in the account, not the browser.
@@ -83,6 +93,7 @@ test("clear message when Claude rejects the web search tool", async ({ page }) =
     json: { error: { code: "search_tool_rejected", message: "tools.0: Input tag 'web_search_20260209' does not match" } },
   }));
   await page.goto("/");
+  await openTab(page, "check");
   await page.setInputFiles("#csvIn", fixtures);
   await page.click("#runBtn");
   const status = page.locator("#status");
@@ -101,13 +112,13 @@ test("listing writer and reply drafter talk to Claude", async ({ page }) => {
     await route.fulfill({ json: { text: "Hi! Yes, £45 works.\n\nNote: above your floor.", truncated: false } });
   });
   await page.goto("/");
-  await visible(page, 'nav.menu button[data-tab="list"]').click();
+  await openTab(page, "list");
   await page.fill("#listNotes", "Nike Dunk Low, UK 9, worn twice");
   await page.click("#listBtn");
   await expect(page.locator("#listOut")).toContainText("£45 works");
   await expect(page.locator("#listCopy")).toBeVisible();
 
-  await visible(page, 'nav.menu button[data-tab="reply"]').click();
+  await openTab(page, "reply");
   await page.fill("#rMsg", "Would you take £45?");
   await page.fill("#rPrice", "50");
   await page.click("#rBtn");
@@ -142,10 +153,10 @@ test("sign in with an email link code", async ({ page }) => {
   await expect(page.locator("#gateMsg")).toContainText("didn't work or has expired");
   await page.fill("#gCode", "123456");
   await page.click("#gCodeBtn");
-  await expect(page.locator("#home")).toBeVisible();
+  await expect(page.locator("#dash")).toBeVisible();
   await expect(page.locator("#gate")).toBeHidden();
   await expect(page.locator("#c-drive")).toHaveClass(/ok/);
-  await visible(page, '[data-go="set"]').click();
+  await openTab(page, "set");
   await expect(page.locator("#accEmail")).toHaveText("me@example.com");
 });
 
@@ -169,13 +180,13 @@ test("sign in with a password", async ({ page }) => {
   await expect(page.locator("#gateMsg")).toContainText("don't match");
   await page.fill("#gPw", "correct-horse");
   await page.click("#gPwBtn");
-  await expect(page.locator("#home")).toBeVisible();
+  await expect(page.locator("#dash")).toBeVisible();
 });
 
 test("settings are saved in the account and come back after a reload", async ({ page }) => {
   const store = await useFakeSupabase(page);
   await page.goto("/");
-  await visible(page, '[data-go="set"]').click();
+  await openTab(page, "set");
   await page.fill("#sBudget", "350");
   await page.fill("#sStale", "45");
   await page.click('#setForm button[type="submit"]');
@@ -184,7 +195,7 @@ test("settings are saved in the account and come back after a reload", async ({ 
   // A fresh device: nothing in the browser except the sign-in.
   await page.evaluate(k => { for (const x of Object.keys(localStorage)) if (x !== k) localStorage.removeItem(x); }, STORAGE_KEY);
   await page.reload();
-  await visible(page, '[data-go="set"]').click();
+  await openTab(page, "set");
   await expect(page.locator("#sBudget")).toHaveValue("350");
   await expect(page.locator("#sStale")).toHaveValue("45");
 });
@@ -205,13 +216,13 @@ test("old settings and reports on this device can be moved into the account", as
   await expect(page.locator("#moveWhat")).toHaveText("your settings and 1 past report");
   await page.click("#moveYes");
   await expect(page.locator("#moveCard")).toBeHidden();
-  await expect(page.locator("#home")).toBeVisible();
+  await expect(page.locator("#dash")).toBeVisible();
   expect(store.settings[0].data).toMatchObject({ budget: 999, setup: { "c-sheet": true } });
   expect(store.reports.map(r => r.id)).toEqual(["r1760173200000"]);
   expect(await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith("rhq-")))).toEqual([]); // old password gone too
-  await visible(page, '[data-go="set"]').click();
+  await openTab(page, "set");
   await expect(page.locator("#sBudget")).toHaveValue("999");
-  await visible(page, 'nav.menu button[data-tab="hist"]').click();
+  await openTab(page, "hist");
   await expect(page.locator("#histList")).toContainText("7-day profit £12.00");
 });
 
@@ -219,7 +230,7 @@ test("download my data", async ({ page }) => {
   const store = await useFakeSupabase(page);
   store.settings.push({ user_id: "user-1", data: { budget: 123 } });
   await page.goto("/");
-  await visible(page, '[data-go="set"]').click();
+  await openTab(page, "set");
   const [download] = await Promise.all([page.waitForEvent("download"), page.click("#accDownload")]);
   expect(download.suggestedFilename()).toBe("reselling-hq-my-data-2026-10-18.json");
   const file = JSON.parse(require("fs").readFileSync(await download.path(), "utf8"));
@@ -232,7 +243,7 @@ test("delete my account asks first, then removes everything", async ({ page }) =
   const store = await useFakeSupabase(page);
   store.settings.push({ user_id: "user-1", data: { budget: 123 } });
   await page.goto("/");
-  await visible(page, '[data-go="set"]').click();
+  await openTab(page, "set");
   page.once("dialog", d => d.accept("delete please"));
   await page.click("#accDelete");
   await expect(page.locator("#accMsg")).toHaveText("Not deleted: you need to type DELETE.");
@@ -249,7 +260,7 @@ test("delete my account asks first, then removes everything", async ({ page }) =
 test("sign out goes back to the sign-in screen", async ({ page }) => {
   await useFakeSupabase(page);
   await page.goto("/");
-  await visible(page, '[data-go="set"]').click();
+  await openTab(page, "set");
   await page.click("#accSignOut");
   await expect(page.locator("#gate h2")).toHaveText("Sign in");
   await expect(page.locator(".shell")).toBeHidden();

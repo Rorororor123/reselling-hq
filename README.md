@@ -80,7 +80,7 @@ Sign-in and your saved data live in Supabase (London region). The database only 
 
 **Supabase, one time:**
 
-1. **SQL Editor, New query**: paste all of `supabase/migrations/001_accounts.sql`, click **Run**.
+1. **SQL Editor, New query**: paste all of `supabase/migrations/001_accounts.sql`, click **Run**. Then do the same with `supabase/migrations/002_tracker.sql` (your orders, stock and expenses, from Stage 4).
 2. Add your email to the allow list (SQL Editor): `insert into public.allowed_emails (email) values ('you@example.com') on conflict do nothing;`
 3. **Authentication, Hooks**: add a **Before User Created** hook, type **Postgres**, schema `public`, function `hook_before_user_created`.
 4. **Authentication, URL Configuration**: Site URL = your live address; Redirect URLs = your live address and your preview address pattern.
@@ -93,8 +93,9 @@ Check it any time at `your-link/api/health`: `"supabase":"ok"` and `"accounts":"
 ## Files
 
 - `index.html`: the screens
-- `css/styles.css`: the look (teal and yellow, light and dark mode)
-- `js/core.js`: the weekly check maths and tracker reading
+- `css/styles.css`: the look (black and purple, light and dark mode; the designs it follows are in `design/`, which isn't published)
+- `js/core.js`: the weekly check and dashboard maths, and tracker reading
+- `js/tracker.js`: the Dashboard and Orders screens and the order form
 - `js/app.js`: everything that happens when you tap things
 - `js/account.js`: sign in, your settings and reports in your account, download my data, delete my account
 - `js/vendor/`: Supabase's sign-in library (a pinned copy, so the app doesn't depend on another website)
