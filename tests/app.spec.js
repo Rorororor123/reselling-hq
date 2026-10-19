@@ -3,7 +3,11 @@ const { test, expect } = require("@playwright/test");
 const path = require("path");
 const { useFakeSupabase, STORAGE_KEY } = require("./fake-supabase");
 
-const fixtures = ["tracker.csv", "expenses.csv"].map(f => path.join(__dirname, "fixtures", f));
+// The old tracker's rows, as they'd be in the app after bringing it in.
+const RHQ = require("../js/core.js");
+const fs = require("fs");
+const tracker = RHQ.parseImport(["tracker.csv", "expenses.csv"].map(f => fs.readFileSync(path.join(__dirname, "fixtures", f), "utf8")));
+const seed = { items: tracker.items, expenses: tracker.expenses };
 const analysis = {
   summary: "A steady week with one good sale.",
   actions: ["Drop the New Balance 550 by 10%", "Relist the Paldean Fates bundle on eBay", "Add a cost for the Stone Island overshirt"],
@@ -36,7 +40,7 @@ test("every screen opens", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("#taxyr")).toHaveText("UK tax year 2026/27");
   await expect(page.locator("#dash")).toBeVisible();
-  for (const tab of ["orders", "check", "list", "reply", "hist", "help", "set", "dash"]) {
+  for (const tab of ["orders", "inv", "sales", "exp", "check", "list", "reply", "hist", "help", "set", "dash"]) {
     await openTab(page, tab);
     const wide = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     expect(wide, tab + " sticks out sideways").toBe(false);
@@ -48,9 +52,9 @@ test("every screen opens", async ({ page }) => {
   expect(wide).toBe(false);
 });
 
-test("weekly check from CSV files with Claude's advice", async ({ page }) => {
+test("weekly check from the built-in tracker with Claude's advice", async ({ page }) => {
   let sent, auth;
-  const store = await useFakeSupabase(page);
+  const store = await useFakeSupabase(page, { seed });
   await page.route("**/api/claude", async route => {
     sent = route.request().postDataJSON();
     auth = route.request().headers().authorization;
@@ -59,8 +63,7 @@ test("weekly check from CSV files with Claude's advice", async ({ page }) => {
   await page.goto("/");
 
   await openTab(page, "check");
-  await page.setInputFiles("#csvIn", fixtures);
-  await expect(page.locator("#status")).toContainText("2 CSV files ready");
+  await expect(page.locator("#csvIn")).toHaveCount(0); // no more Google Sheet or CSV files
   await page.click("#runBtn");
   await expect(page.locator("#status")).toContainText("Done. Report saved", { timeout: 15000 });
 
@@ -76,6 +79,9 @@ test("weekly check from CSV files with Claude's advice", async ({ page }) => {
   await expect(report).toContainText("A steady week with one good sale.");
   await expect(page.locator('#steps li[data-s="done"]')).toHaveCount(4);
 
+  // Same numbers as the old Google Sheet gave (see tests/stock-sales.test.js).
+  await expect(report).toContainText("Reselling HQ ·");
+  await expect(page.locator("#c-stock")).toHaveClass(/ok/);
   // The report is saved and shows in History.
   await openTab(page, "hist");
   await expect(page.locator("#histList button")).toHaveCount(1);
@@ -87,14 +93,13 @@ test("weekly check from CSV files with Claude's advice", async ({ page }) => {
 });
 
 test("clear message when Claude rejects the web search tool", async ({ page }) => {
-  await useFakeSupabase(page);
+  await useFakeSupabase(page, { seed });
   await page.route("**/api/claude", route => route.fulfill({
     status: 502,
     json: { error: { code: "search_tool_rejected", message: "tools.0: Input tag 'web_search_20260209' does not match" } },
   }));
   await page.goto("/");
   await openTab(page, "check");
-  await page.setInputFiles("#csvIn", fixtures);
   await page.click("#runBtn");
   const status = page.locator("#status");
   await expect(status).toContainText("rejected the web search tool (version web_search_20260209)");
@@ -102,6 +107,15 @@ test("clear message when Claude rejects the web search tool", async ({ page }) =
   await expect(status).toHaveClass(/err/);
   // The numbers still show without Claude.
   await expect(page.locator("#report .tile").nth(0)).toContainText("£25.50");
+});
+
+test("weekly check says what to do when there's nothing in the tracker", async ({ page }) => {
+  await useFakeSupabase(page);
+  await page.goto("/");
+  await openTab(page, "check");
+  await page.click("#runBtn");
+  await expect(page.locator("#status")).toContainText("There's no stock or sales in the app yet");
+  await expect(page.locator("#status")).toHaveClass(/err/);
 });
 
 test("listing writer and reply drafter talk to Claude", async ({ page }) => {

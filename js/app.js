@@ -1,20 +1,18 @@
 (() => {
-const {esc, gbp, taxYear, looseJson, num, tableFrom, normInventory, normExpenses, crunch} = RHQ; // from js/core.js
+const {esc, gbp, taxYear, looseJson, num, crunch, trackerToCrunch} = RHQ; // from js/core.js
 const $ = s => document.querySelector(s);
 
 /* ---------- settings ---------- */
-const DEFAULTS = {inv:"", exp:"", stale:30, stalePk:90, offer:85, min:5, post:2, budget:200, source:"retail drops, charity shops, car boots, online deals"};
+const DEFAULTS = {goal:0, stale:30, stalePk:90, offer:85, min:5, post:2, budget:200, source:"retail drops, charity shops, car boots, online deals"};
 /* Settings live in your account (js/account.js). setup = which "Get set up" steps are ticked. */
 const account = window.RHQAccount;
 let S = {...DEFAULTS}, setup = {};
-const map = {inv:"sInv",exp:"sExp",stale:"sStale",stalePk:"sStalePk",offer:"sOffer",min:"sMin",post:"sPost",budget:"sBudget",source:"sSource"};
+const map = {goal:"sGoal",stale:"sStale",stalePk:"sStalePk",offer:"sOffer",min:"sMin",post:"sPost",budget:"sBudget",source:"sSource"};
 const saveAll = () => account.saveSettings({...S, setup});
 $("#setForm").addEventListener("submit", async e => {
   e.preventDefault();
   for (const [k,id] of Object.entries(map)) { const v = $("#"+id).value; S[k] = typeof DEFAULTS[k] === "number" ? Number(v) || DEFAULTS[k] : v.trim() || DEFAULTS[k]; }
-  for (const k of ["inv","exp"]) S[k] = $("#"+map[k]).value.trim();
-  if (S.inv) setup["c-sheet"] = true;
-  try { await saveAll(); $("#setMsg").textContent = "Saved."; if (S.inv) mark("c-sheet", true); }
+  try { await saveAll(); $("#setMsg").textContent = "Saved."; }
   catch { $("#setMsg").textContent = "Couldn't save just now. Check your connection and try again."; return; }
   setTimeout(() => $("#setMsg").textContent = "", 2000);
 });
@@ -87,47 +85,19 @@ const capsReady = account.ready.then(({settings}) => {
   if (!settings) setStatus("Couldn't load your settings just now, so the standard ones are in use. Reload to try again.", true);
   const {setup: done, ...saved} = settings || {};
   S = {...DEFAULTS, ...saved}; setup = done || {};
-  for (const [k,id] of Object.entries(map)) $("#"+id).value = S[k];
+  for (const [k,id] of Object.entries(map)) $("#"+id).value = k === "goal" && !S.goal ? "" : S[k];
   setup["c-drive"] = true; // signed in
   for (const k in setup) if (setup[k]) mark(k, true);
 });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 
-/* ---------- reading the tracker ---------- */
-let csvTexts = null;
-$("#csvIn").addEventListener("change", async e => {
-  const files = [...e.target.files]; if (!files.length) return;
-  csvTexts = await Promise.all(files.map(f => f.text()));
-  $("#srcLabel").textContent = "Reading from: " + files.map(f => f.name).join(", ");
-  setStatus(files.length + " CSV file" + (files.length > 1 ? "s" : "") + " ready. Click Run my weekly check.");
+/* ---------- appearance (this device only) ---------- */
+try { $("#sTheme").value = localStorage.getItem("rhq-theme") || ""; } catch {}
+$("#sTheme").addEventListener("change", e => {
+  const t = e.target.value;
+  try { t ? localStorage.setItem("rhq-theme", t) : localStorage.removeItem("rhq-theme"); } catch {}
+  t ? document.documentElement.dataset.theme = t : delete document.documentElement.dataset.theme;
 });
-
-async function readFromDrive() {
-  if (!S.inv) throw {friendly: "Add your Inventory tab's CSV link in Settings first, or use CSV files instead."};
-  const get = async u => { try { return (await api("/api/sheet?url=" + encodeURIComponent(u))).text; } catch (e) { throw {friendly: sheetErr(e)}; } };
-  const inv = await get(S.inv);
-  const exp = S.exp ? await get(S.exp) : "";
-  return {text: inv + "\n\n" + exp, fileName: "your Google Sheet"};
-}
-function sheetErr(e) {
-  switch (e && e.code) {
-    case "signed_out": return "You've been signed out. Reload the page and sign in again.";
-    case "not_allowed": return "This account isn't on the Reselling HQ invite list.";
-    case "bad_url": return "That sheet link doesn't look right. It should start with https://docs.google.com/spreadsheets/ and end in output=csv.";
-    case "not_published": return "Google wouldn't share the sheet. Check the tab is published to the web as CSV.";
-    case "offline": return "You seem to be offline. Check your connection and try again.";
-    default: return "Couldn't read your sheet (" + ((e && e.code) || "error") + "). Try again, or use CSV files instead.";
-  }
-}
-
-async function extractWithClaude(text) {
-  const prompt = "Below is the text of a reselling tracker spreadsheet. Extract the Inventory rows and Expenses rows exactly as written.\n" +
-    "Reply with only JSON: {\"inventory\":[{\"item id\":\"\",\"item name\":\"\",\"category\":\"\",\"size/details\":\"\",\"cost\":\"\",\"status\":\"\",\"date bought\":\"\",\"date listed\":\"\",\"platform sold on\":\"\",\"date sold\":\"\",\"sale price\":\"\",\"platform fees\":\"\",\"postage\":\"\"}],\"expenses\":[{\"date\":\"\",\"description\":\"\",\"category\":\"\",\"amount\":\"\"}]}\n" +
-    "Copy values as text, dates as DD/MM/YYYY, leave unknowns as empty strings, skip blank rows. Do not calculate anything.\n\n" + text.slice(0, 180000);
-  const lower = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k.toLowerCase(), v]));
-  const j = await sample.json(prompt, {modelTier: "quick"});
-  return {inv: (j.inventory || []).map(lower), exp: (j.expenses || []).map(lower)};
-}
 
 /* ---------- AI ---------- */
 async function analyse(nums) {
@@ -177,26 +147,16 @@ $("#runBtn").addEventListener("click", async () => {
   let nums = null, ai = null, source = "";
   try {
     step("read", "run"); setStatus("Reading your tracker…");
-    let inv, exp;
-    if (csvTexts) {
-      inv = []; exp = [];
-      for (const t of csvTexts) {
-        const i = tableFrom(t, "item name"); if (i) inv.push(...normInventory(i));
-        const x = tableFrom(t, "amount"); if (x && !i) exp.push(...normExpenses(x));
-      }
-      source = "CSV files";
-    } else {
-      const {text, fileName} = await readFromDrive();
-      source = "Google Sheet"; rememberSetup("c-drive"); rememberSetup("c-sheet");
-      const i = tableFrom(text, "item name"), x = tableFrom(text, "amount");
-      if (i && i.length) { inv = normInventory(i); exp = normExpenses(x); }
-      else {
-        if (!sample) throw {friendly: "Couldn't read the sheet's layout. Try the CSV option instead."};
-        setStatus("Reading your sheet with Claude…");
-        const r = await extractWithClaude(text); inv = normInventory(r.inv); exp = normExpenses(r.exp);
-      }
-    }
-    if (!inv.length) throw {friendly: "No items found in your tracker yet. Add your stock to the Inventory tab, then run again."};
+    // Your stock, sales and expenses from the app itself (js/tracker.js loads them).
+    const tracker = window.RHQTracker;
+    await tracker.ready;
+    if (tracker.data.error) await tracker.reload();
+    if (tracker.data.error === "missing") throw {friendly: "The tracker isn't set up in your database yet. Open the Dashboard for the one-time setup step."};
+    if (tracker.data.error) throw {friendly: "Couldn't load your stock and sales just now. Check your connection and try again."};
+    const {inv, exp} = trackerToCrunch(tracker.data.items, tracker.data.expenses);
+    source = "Reselling HQ";
+    if (!inv.length) throw {friendly: "There's no stock or sales in the app yet. Add some on the Inventory or Sales screen (or bring in your old tracker from Settings), then run again."};
+    rememberSetup("c-stock");
     step("read", "done");
 
     step("crunch", "run"); nums = crunch(inv, exp, S); nums.source = source; step("crunch", "done");
@@ -220,7 +180,7 @@ $("#runBtn").addEventListener("click", async () => {
     if (ai) setStatus("Done. Report saved " + new Date().toLocaleString("en-GB", {weekday: "long", hour: "2-digit", minute: "2-digit"}) + ".");
   } catch (e) {
     document.querySelectorAll('#steps li[data-s="run"]').forEach(li => li.dataset.s = "err");
-    setStatus(e && e.friendly ? e.friendly : "Something went wrong reading your tracker. Try again or use CSV files.", true);
+    setStatus(e && e.friendly ? e.friendly : "Something went wrong reading your tracker. Try again in a moment.", true);
   } finally { btn.disabled = false; btn.querySelector("span").textContent = "Run my weekly check"; }
 });
 
@@ -283,7 +243,7 @@ function renderReport({nums: n, ai, pending, example}) {
 }
 
 /* ---------- setup checklist & last run ---------- */
-function mark(id, state) { const li = $("#" + id); li.classList.toggle("ok", state === true); li.classList.toggle("bad", state === false); updateSetupCount(); }
+function mark(id, state) { const li = $("#" + id); if (!li) return; li.classList.toggle("ok", state === true); li.classList.toggle("bad", state === false); updateSetupCount(); }
 function updateSetupCount() {
   const ok = document.querySelectorAll("#setupCard .check li.ok").length;
   $("#setupCount").textContent = ok + " of 4";
@@ -301,7 +261,7 @@ $("#greet").textContent = (hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon"
     try {
       const snap = await db.collection("data/users/" + uid).orderBy("ts", "desc").limit(1).get();
       const last = snap.docs.map(d => d.data()).find(d => d && d.kind === "report");
-      if (last) { showLastRun(last.ts); renderReport({nums: last.nums, ai: last.ai}); ["c-drive","c-sheet","c-claude","c-run"].forEach(k => mark(k, true)); }
+      if (last) { showLastRun(last.ts); renderReport({nums: last.nums, ai: last.ai}); ["c-drive","c-stock","c-claude","c-run"].forEach(k => mark(k, true)); }
     } catch {}
   }
 })();
@@ -425,6 +385,7 @@ window.RHQApp = {
   go, ready: capsReady, onShow: (tab, fn) => { showHooks[tab] = fn; },
   isShowing: tab => current === tab,
   settings: () => S,
+  setupDone: k => rememberSetup(k),
   // Saves some settings (goal, dashboard boxes...) into the account alongside the rest.
   async save(patch) { Object.assign(S, patch); await saveAll(); },
 };

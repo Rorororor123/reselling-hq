@@ -115,6 +115,11 @@ describe("needs action", () => {
   it("starts with the most urgent", () => {
     expect(d.actions[0].level).toBe("bad");
   });
+  it("reminds you to download a backup once a week", () => {
+    expect(titles).toContain("Download your first backup");
+    expect(dashboard({ items }, { lastBackup: "2026-10-09T10:00:00Z" }, NOW).actions.map(a => a.title)).toContain("Your last backup was 10 days ago");
+    expect(dashboard({ items }, { lastBackup: "2026-10-14T10:00:00Z" }, NOW).actions.some(a => a.kind === "backup")).toBe(false);
+  });
   it("is empty for an empty tracker", () => {
     expect(dashboard({}, settings, NOW).actions).toEqual([]);
   });

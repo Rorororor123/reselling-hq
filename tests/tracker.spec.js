@@ -17,8 +17,8 @@ async function goOrders(page) {
 }
 // The + button on a phone, the Add order button on a computer.
 async function startOrder(page) {
-  if (isPhone(page)) { await page.click(".fab"); await page.click('#addSheet [data-add="order"]'); }
-  else await page.locator('#dash [data-add="order"]').click();
+  await page.click(isPhone(page) ? ".fab" : '#dash [data-sheet="addSheet"]');
+  await page.click('#addSheet [data-add="order"]');
   await expect(page.locator("#orderSheet")).toBeVisible();
 }
 const card = (page, text) => page.locator("#ordList .ocard", { hasText: text });
@@ -26,7 +26,7 @@ const card = (page, text) => page.locator("#ordList .ocard", { hasText: text });
 test("add an order, move it along, then into stock", async ({ page }) => {
   const store = await useFakeSupabase(page);
   await page.goto("/");
-  await expect(page.locator("#dashOut")).toContainText("Add your first order");
+  await expect(page.locator("#dashOut")).toContainText("Tap Add to put in an order");
   await startOrder(page);
   await page.click('#orderForm [type="submit"]');
   await expect(page.locator("#orderForm .formmsg")).toHaveText("Say what you ordered.");

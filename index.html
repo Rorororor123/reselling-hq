@@ -13,6 +13,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}</style>
 <title>Reselling HQ</title>
+<script>try{var t=localStorage.getItem("rhq-theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
 <link rel="stylesheet" href="/css/styles.css">
@@ -78,6 +79,9 @@
     <nav class="menu" aria-label="Main">
       <button data-tab="dash" aria-current="page"><svg class="i"><use href="#i-dash"/></svg>Dashboard</button>
       <button data-tab="orders"><svg class="i"><use href="#i-truck"/></svg>Orders<span class="badge" data-orders-badge hidden></span></button>
+      <button data-tab="inv"><svg class="i"><use href="#i-box"/></svg>Inventory</button>
+      <button data-tab="sales"><svg class="i"><use href="#i-tag"/></svg>Sales</button>
+      <button data-tab="exp"><svg class="i"><use href="#i-card"/></svg>Expenses</button>
       <button data-tab="orders" data-filter="preorders"><svg class="i"><use href="#i-clock"/></svg>Pre-orders</button>
       <button data-tab="check"><svg class="i"><use href="#i-play"/></svg>Weekly check</button>
       <button data-tab="hist"><svg class="i"><use href="#i-chart"/></svg>Past reports</button>
@@ -85,7 +89,7 @@
     <div class="railsep"></div>
     <span class="railhead">Tools</span>
     <nav class="menu" aria-label="Tools">
-      <button data-tab="list"><svg class="i"><use href="#i-tag"/></svg>Listing writer</button>
+      <button data-tab="list"><svg class="i"><use href="#i-camera"/></svg>Listing writer</button>
       <button data-tab="reply"><svg class="i"><use href="#i-chat"/></svg>Buyer replies</button>
       <button data-tab="help"><svg class="i"><use href="#i-help"/></svg>Help</button>
     </nav>
@@ -126,35 +130,70 @@
   <div class="olist" id="ordList"></div>
 </section>
 
+<!-- INVENTORY -->
+<section class="tab" id="inv" hidden>
+  <div class="pagehead">
+    <div><h2>Inventory</h2><p class="lede">Everything you're holding to sell. Tap an item to edit it.</p></div>
+    <button class="btn primary" type="button" data-add="item"><svg class="i"><use href="#i-plus"/></svg>Add stock</button>
+  </div>
+  <div class="statgrid" id="invStats"></div>
+  <div class="filters">
+    <div class="filters" role="group" aria-label="Filter stock" id="invFilters"></div>
+    <label class="search"><svg class="i"><use href="#i-search"/></svg><span class="sr">Search stock</span><input type="search" id="invSearch" placeholder="Search name, size or category" autocomplete="off"></label>
+  </div>
+  <div class="olist" id="invList"></div>
+</section>
+
+<!-- SALES -->
+<section class="tab" id="sales" hidden>
+  <div class="pagehead">
+    <div><h2>Sales</h2><p class="lede">What you've sold, and what's still to post.</p></div>
+    <button class="btn primary" type="button" data-add="sale"><svg class="i"><use href="#i-plus"/></svg>Record a sale</button>
+  </div>
+  <div class="statgrid" id="saleStats"></div>
+  <div class="filters">
+    <div class="filters" role="group" aria-label="Which sales" id="saleFilters"></div>
+    <label class="search" style="flex:0 1 220px;min-width:160px"><span class="sr">Platform</span><select id="salePlatform" class="bare"></select></label>
+  </div>
+  <div class="olist" id="saleList"></div>
+</section>
+
+<!-- EXPENSES -->
+<section class="tab" id="exp" hidden>
+  <div class="pagehead">
+    <div><h2>Expenses</h2><p class="lede">One-off costs and subscriptions. Monthly and yearly ones count again each time they come round.</p></div>
+    <button class="btn primary" type="button" data-add="expense"><svg class="i"><use href="#i-plus"/></svg>Add expense</button>
+  </div>
+  <div class="statgrid" id="expStats"></div>
+  <div class="olist" id="expList"></div>
+  <p class="note">Tax figures are a guide, not advice. Check what you can claim on gov.uk.</p>
+</section>
+
 <!-- WEEKLY CHECK -->
 <section class="tab narrow" id="check" hidden>
   <div class="hero">
     <div>
       <h2 id="greet">Your weekly check</h2>
-      <p class="lede">Press the button once a week. It reads your tracker, works out your profit, finds stale stock and gets Claude's advice.</p>
+      <p class="lede">Press the button once a week. It reads your stock, sales and expenses, works out your profit, finds stale stock and gets Claude's advice.</p>
     </div>
     <div class="herorow">
       <button class="bigbtn" id="runBtn"><svg class="i"><use href="#i-play"/></svg><span>Run my weekly check</span></button>
       <div class="lastrun" id="lastRun">Not run yet</div>
     </div>
     <ul class="steps" id="steps">
-      <li data-k="read"><span class="dot"></span>Read tracker</li>
+      <li data-k="read"><span class="dot"></span>Read your tracker</li>
       <li data-k="crunch"><span class="dot"></span>Crunch numbers</li>
       <li data-k="ai"><span class="dot"></span>Claude's advice</li>
       <li data-k="save"><span class="dot"></span>Save report</li>
     </ul>
     <div class="status" id="status" role="status"></div>
-    <div class="herorow" style="gap:10px">
-      <span class="lastrun" id="srcLabel">Reading from: your Google Sheet</span>
-      <label class="ghost"><svg class="i" style="width:16px;height:16px"><use href="#i-file"/></svg>Use CSV files instead<input type="file" id="csvIn" accept=".csv,text/csv" multiple hidden></label>
-    </div>
   </div>
 
   <div class="card" id="setupCard">
     <div class="cardhead"><h3>Get set up</h3><span class="count" id="setupCount">0 of 4</span></div>
     <ul class="check">
       <li id="c-drive"><span class="tick"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span><div><b>Sign in</b><small>Done. Your settings and reports are saved in your account.</small></div></li>
-      <li id="c-sheet"><span class="tick"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span><div><b>Link your Google Sheet</b><small>Publish the Inventory and Expenses tabs as CSV and paste both links into Settings. (In the next update the weekly check reads the app's own tracker instead.)</small></div></li>
+      <li id="c-stock"><span class="tick"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span><div><b>Add your stock</b><small>Add items on the Inventory screen, move delivered orders into stock, or bring in your old tracker from Settings.</small></div></li>
       <li id="c-claude"><span class="tick"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span><div><b>Claude connected</b><small>Ticks itself once Claude answers for the first time.</small></div></li>
       <li id="c-run"><span class="tick"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span><div><b>Run your first weekly check</b><small>Press the purple button above.</small></div></li>
     </ul>
@@ -215,26 +254,27 @@
 <section class="tab narrow" id="help" hidden>
   <div><h2>How to use Reselling HQ</h2><p class="lede">Five minutes a week once it's set up.</p></div>
   <div class="card faq">
-    <details open><summary>Set up (one time, about 15 minutes)</summary><ol>
-      <li>In your Google Sheet, choose File, Share, Publish to web. Pick the <b>Inventory</b> tab and <b>Comma-separated values (.csv)</b>, then Publish and copy the link.</li>
-      <li>Do the same for the <b>Expenses</b> tab.</li>
-      <li>Open Settings in this app and paste both links. Check your stale limits, offer rules and budget, then Save.</li>
-      <li>Press <b>Run my weekly check</b>.</li>
+    <details open><summary>Set up (one time, about 10 minutes)</summary><ol>
+      <li>Open <b>Settings</b>. Under <b>Bring in your old tracker</b>, choose your old spreadsheet (or skip this and start fresh).</li>
+      <li>Check your stale limits, offer rules, budget and monthly goal in Settings, then Save.</li>
+      <li>Add new things as they happen: orders when you buy, sales when you sell, expenses when you pay. The + button on a phone does all four.</li>
+      <li>Go to <b>Weekly check</b> and press <b>Run my weekly check</b>.</li>
     </ol></details>
     <details><summary>Orders and the dashboard</summary><p>Add each thing you buy on the Orders screen (the + button on a phone). Move it along as it ships, and when it's delivered tap <b>Move into stock</b>. The dashboard shows your profit, what's on the way, your stock, pre-orders and anything that needs doing. Tap <b>Customise</b> to choose which boxes show.</p></details>
     <details><summary>Every week</summary><ol>
-      <li>Make sure your sales and new stock are in the tracker sheet.</li>
+      <li>Make sure this week's sales, new stock and expenses are in the app.</li>
       <li>Open this app, go to Weekly check and press Run my weekly check.</li>
       <li>Work through "This week's plan" and the stale stock list.</li>
-      <li>Fix any rows listed under "Records and tax check".</li>
+      <li>Fix anything listed under "Records and tax check" or "Needs action".</li>
+      <li>Download a backup (Settings, Download backup) and keep it somewhere safe.</li>
     </ol></details>
     <details><summary>Writing a listing</summary><p>Go to Listings, add photos, type a line about the item (brand, model, size, condition, flaws), and press Write listing. Copy each section into eBay or Vinted. Always check sizes and condition before posting.</p></details>
     <details><summary>Replying to a buyer</summary><p>Go to Replies, paste their message, add the listed price and your cost, then press Draft reply. It accepts offers above your lowest price (set in Settings) and counters ones below it.</p></details>
     <details><summary>Signing in on a new phone</summary><p>Open the app, type your email and tap Email me a sign-in link. Open the link on that same phone, or type the code from the email into the app (handy if you installed the app on your home screen). You stay signed in until you press Sign out in Settings. To skip the email, set a password in Settings.</p></details>
-    <details><summary>It can't read my sheet</summary><p>Check both links in Settings start with https://docs.google.com/spreadsheets/ and end in output=csv. Or press "Use CSV files instead": open each tab, choose File, Download, CSV, then pick both files.</p></details>
-    <details><summary>Are the drops and niche ideas live?</summary><p>Yes. Claude searches the web during your weekly check for release dates and recent sold prices. Still double-check before you spend money. Your profit, stock and stale numbers come straight from your own sheet.</p></details>
+    <details><summary>Bringing in my old spreadsheet</summary><p>In Settings, choose <b>Bring in your old tracker</b> and pick the Excel file. From Google Sheets, choose File, Download, Microsoft Excel (.xlsx) first. It reads tabs with an "Item Name" column (stock and sales) and an "Amount" column (expenses), shows you what it found, and skips anything already in the app, so it's safe to do twice.</p></details>
+    <details><summary>Are the drops and niche ideas live?</summary><p>Yes. Claude searches the web during your weekly check for release dates and recent sold prices. Still double-check before you spend money. Your profit, stock and stale numbers come straight from what you've entered in the app.</p></details>
     <details><summary>Install it on your phone</summary><p>iPhone: open the site in Safari, tap Share, then Add to Home Screen. Android: open it in Chrome, tap the menu, then Install app or Add to Home screen.</p></details>
-    <details><summary>Is my sheet private?</summary><p>A sheet published to the web can be opened by anyone who has the exact link, though it isn't listed or searchable. Don't share the links, and you can unpublish any time from File, Share, Publish to web.</p></details>
+    <details><summary>Is my data private?</summary><p>Your stock, sales, orders and expenses are saved in your account and only you can see them. If you published your old Google Sheet to the web for the earlier version of this app, you can now unpublish it: in the sheet, choose File, Share, Publish to web, then Stop publishing.</p></details>
   </div>
 </section>
 
@@ -257,9 +297,10 @@
   </div>
   <div class="card">
   <form class="tool" id="setForm">
-    <h3>Your tracker</h3>
-    <label>Inventory tab CSV link<input type="text" id="sInv" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?gid=0&amp;single=true&amp;output=csv"></label>
-    <label>Expenses tab CSV link<input type="text" id="sExp" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?gid=...&amp;output=csv"></label>
+    <h3>Monthly goal</h3>
+    <div class="row3">
+      <label>Profit goal each month (£)<input type="number" id="sGoal" min="0" step="10" inputmode="decimal" placeholder="e.g. 600"></label>
+    </div>
     <h3>Stale stock</h3>
     <div class="row3">
       <label>Shoes and clothing (days)<input type="number" id="sStale" value="30" min="1"></label>
@@ -279,6 +320,20 @@
     <div class="btnrow"><button class="btn primary" type="submit">Save settings</button><span class="sub" id="setMsg"></span></div>
   </form>
   </div>
+  <div class="card">
+    <div class="cardhead"><h3>Your data</h3></div>
+    <div class="tool" style="display:grid;gap:16px">
+      <div><b>Download backup</b><p class="sub" style="margin:4px 0 10px">Saves all your stock, sales, orders, expenses and settings as one Excel file. Keep a copy somewhere safe each week.</p>
+        <div class="btnrow"><button class="btn" id="backupBtn" type="button"><svg class="i"><use href="#i-file"/></svg>Download backup</button><span class="sub" id="backupMsg" role="status"></span></div></div>
+      <div><b>Bring in your old tracker</b><p class="sub" style="margin:4px 0 10px">Pick your old spreadsheet (Excel .xlsx) or its tabs saved as CSV files, or a backup from this app. You'll see what will be added before anything is saved, and anything already here is skipped.</p>
+        <label class="btn" style="display:inline-flex;width:auto"><svg class="i"><use href="#i-file"/></svg>Choose files<input type="file" id="importIn" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden></label>
+        <div id="importOut" class="importout" aria-live="polite"></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="cardhead"><h3>Appearance</h3></div>
+    <label style="max-width:320px">Colours on this device<select id="sTheme"><option value="">Match my phone or computer</option><option value="dark">Dark</option><option value="light">Light</option></select></label>
+  </div>
 </section>
 
   </div>
@@ -287,8 +342,8 @@
   <nav class="tabbar" aria-label="Main">
     <button data-tab="dash" aria-current="page"><svg class="i"><use href="#i-dash"/></svg>Home</button>
     <button data-tab="orders"><svg class="i"><use href="#i-truck"/></svg>Orders</button>
-    <button data-tab="check"><svg class="i"><use href="#i-play"/></svg>Check</button>
-    <button data-tab="list"><svg class="i"><use href="#i-tag"/></svg>Listings</button>
+    <button data-tab="inv"><svg class="i"><use href="#i-box"/></svg>Stock</button>
+    <button data-tab="sales"><svg class="i"><use href="#i-tag"/></svg>Sales</button>
     <button data-sheet="moreSheet" aria-haspopup="dialog"><svg class="i"><use href="#i-more"/></svg>More</button>
   </nav>
   <button class="fab" type="button" data-sheet="addSheet" aria-label="Add" aria-haspopup="dialog"><svg class="i"><use href="#i-plus"/></svg></button>
@@ -297,6 +352,9 @@
 <dialog class="sheet" id="moreSheet" aria-labelledby="moreTitle">
   <div class="sheethead"><h3 id="moreTitle">More</h3><button class="x" type="button" data-close aria-label="Close">×</button></div>
   <div class="sheetbody menulist">
+    <button data-tab="exp"><svg class="i"><use href="#i-card"/></svg><span>Expenses<small>Subscriptions, proxies, packaging and more</small></span></button>
+    <button data-tab="check"><svg class="i"><use href="#i-play"/></svg><span>Weekly check<small>Your week's numbers and Claude's advice</small></span></button>
+    <button data-tab="list"><svg class="i"><use href="#i-camera"/></svg><span>Listing writer<small>Photos and notes in, listings out</small></span></button>
     <button data-tab="orders" data-filter="preorders"><svg class="i"><use href="#i-clock"/></svg><span>Pre-orders<small>Paid for, not released yet</small></span></button>
     <button data-tab="hist"><svg class="i"><use href="#i-chart"/></svg><span>Past reports<small>Every weekly check you've run</small></span></button>
     <button data-tab="reply"><svg class="i"><use href="#i-chat"/></svg><span>Buyer replies<small>Paste an offer or question, get a reply</small></span></button>
@@ -309,7 +367,9 @@
   <div class="sheethead"><h3 id="addTitle">Add</h3><button class="x" type="button" data-close aria-label="Close">×</button></div>
   <div class="sheetbody menulist">
     <button data-add="order"><svg class="i"><use href="#i-truck"/></svg><span>Order<small>Something you've bought or pre-ordered</small></span></button>
-    <p class="sub" style="margin:0">Adding stock, sales and expenses here comes in the next update.</p>
+    <button data-add="item"><svg class="i"><use href="#i-box"/></svg><span>Stock item<small>Something you're holding to sell</small></span></button>
+    <button data-add="sale"><svg class="i"><use href="#i-tag"/></svg><span>Sale<small>Something you've sold</small></span></button>
+    <button data-add="expense"><svg class="i"><use href="#i-card"/></svg><span>Expense<small>A one-off cost or a subscription</small></span></button>
   </div>
 </dialog>
 
@@ -343,6 +403,89 @@
   </form>
 </dialog>
 
+<dialog class="sheet" id="itemSheet" aria-labelledby="itemTitle">
+  <form method="dialog" id="itemForm" novalidate>
+    <div class="sheethead"><h3 id="itemTitle">Add stock</h3><button class="x" type="button" data-close aria-label="Close">×</button></div>
+    <div class="sheetbody">
+      <div class="sheetgrid">
+        <label class="full">Item<input type="text" name="name" required maxlength="300" placeholder="e.g. Jordan 4 Military Black"></label>
+        <label>Category<input type="text" name="category" maxlength="80" list="catList" placeholder="e.g. Shoes"></label>
+        <label>Size or details<input type="text" name="size" maxlength="120" placeholder="e.g. UK 9, sealed"></label>
+        <label>What you paid (£)<input type="number" name="cost" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 165"></label>
+        <label>Asking price (£)<input type="number" name="ask_price" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 200"></label>
+        <label>Status<select name="status"><option>In stock</option><option>Listed</option><option>Sold</option></select></label>
+        <label>Date bought<input type="date" name="bought"></label>
+        <label data-listed hidden>Date listed<input type="date" name="listed"></label>
+      </div>
+      <div class="sheetgrid" data-sold hidden>
+        <h3 class="full" style="font-size:16px;margin-top:4px">Sale</h3>
+        <label>Platform<input type="text" name="platform" maxlength="40" list="platList" placeholder="e.g. eBay"></label>
+        <label>Date sold<input type="date" name="sold"></label>
+        <label>Sale price (£)<input type="number" name="sale_price" min="0" step="0.01" inputmode="decimal"></label>
+        <label>Platform fees (£)<input type="number" name="fees" min="0" step="0.01" inputmode="decimal" placeholder="0"></label>
+        <label>Postage you paid (£)<input type="number" name="postage" min="0" step="0.01" inputmode="decimal" placeholder="0"></label>
+        <label class="checkrow"><input type="checkbox" name="posted">Posted</label>
+      </div>
+      <label>Notes<input type="text" name="notes" maxlength="2000"></label>
+      <p class="formmsg" role="alert"></p>
+      <div class="btnrow">
+        <button class="btn primary" type="submit">Save</button>
+        <button class="btn" type="button" data-close>Cancel</button>
+        <button class="btn danger" type="button" data-delete hidden style="margin-left:auto">Delete</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="sheet" id="saleSheet" aria-labelledby="saleTitle">
+  <form method="dialog" id="saleForm" novalidate>
+    <div class="sheethead"><h3 id="saleTitle">Record a sale</h3><button class="x" type="button" data-close aria-label="Close">×</button></div>
+    <div class="sheetbody">
+      <label>What did you sell?<select name="item_id"></select></label>
+      <div class="sheetgrid" data-new hidden>
+        <label class="full">Item<input type="text" name="name" maxlength="300" placeholder="e.g. Nike Tech Fleece"></label>
+        <label>What you paid (£)<input type="number" name="cost" min="0" step="0.01" inputmode="decimal"></label>
+        <label>Category<input type="text" name="category" maxlength="80" list="catList"></label>
+      </div>
+      <div class="sheetgrid">
+        <label>Platform<input type="text" name="platform" maxlength="40" list="platList" placeholder="e.g. Vinted"></label>
+        <label>Date sold<input type="date" name="sold"></label>
+        <label>Sale price (£)<input type="number" name="sale_price" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 65"></label>
+        <label>Platform fees (£)<input type="number" name="fees" min="0" step="0.01" inputmode="decimal" placeholder="0"></label>
+        <label>Postage you paid (£)<input type="number" name="postage" min="0" step="0.01" inputmode="decimal" placeholder="0"></label>
+        <label class="checkrow"><input type="checkbox" name="posted">Already posted</label>
+      </div>
+      <p class="sub" data-profit style="margin:0"></p>
+      <p class="formmsg" role="alert"></p>
+      <div class="btnrow"><button class="btn primary" type="submit">Save sale</button><button class="btn" type="button" data-close>Cancel</button></div>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="sheet" id="expSheet" aria-labelledby="expTitle">
+  <form method="dialog" id="expForm" novalidate>
+    <div class="sheethead"><h3 id="expTitle">Add expense</h3><button class="x" type="button" data-close aria-label="Close">×</button></div>
+    <div class="sheetbody">
+      <div class="sheetgrid">
+        <label class="full">What was it?<input type="text" name="description" required maxlength="300" placeholder="e.g. Bot subscription"></label>
+        <label>Amount (£)<input type="number" name="amount" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 60"></label>
+        <label>Date<input type="date" name="date"></label>
+        <label>Category<input type="text" name="category" maxlength="80" list="expCatList" placeholder="e.g. Software and bots"></label>
+        <label>How often<select name="repeat"><option value="once">One-off</option><option value="monthly">Every month</option><option value="yearly">Every year</option></select></label>
+        <label data-end hidden>Stops on (optional)<input type="date" name="end_date"></label>
+        <label class="checkrow full"><input type="checkbox" name="deductible">Tax-deductible (a business cost)</label>
+        <label class="full">Notes<input type="text" name="notes" maxlength="2000"></label>
+      </div>
+      <p class="formmsg" role="alert"></p>
+      <div class="btnrow">
+        <button class="btn primary" type="submit">Save</button>
+        <button class="btn" type="button" data-close>Cancel</button>
+        <button class="btn danger" type="button" data-delete hidden style="margin-left:auto">Delete</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
 <dialog class="sheet" id="custSheet" aria-labelledby="custTitle">
   <form method="dialog" id="custForm">
     <div class="sheethead"><h3 id="custTitle">Choose what your dashboard shows</h3><button class="x" type="button" data-close aria-label="Close">×</button></div>
@@ -365,13 +508,17 @@
 
 <datalist id="shopList"><option>Pokémon Center</option><option>Smyths</option><option>Argos</option><option>Nike</option><option>adidas</option><option>END.</option><option>Size?</option><option>JD Sports</option><option>Amazon</option><option>Selfridges</option></datalist>
 <datalist id="courierList"><option>Royal Mail</option><option>Evri</option><option>DPD</option><option>DHL</option><option>UPS</option><option>Yodel</option><option>Parcelforce</option><option>InPost</option><option>Amazon</option></datalist>
+<datalist id="platList"><option>eBay</option><option>Vinted</option><option>StockX</option><option>Depop</option><option>Facebook Marketplace</option><option>In person</option></datalist>
+<datalist id="expCatList"><option>Software and bots</option><option>Proxies</option><option>Packaging and postage</option><option>Travel</option><option>Fees</option><option>Other</option></datalist>
 <datalist id="catList"><option>Pokémon</option><option>Shoes</option><option>Clothing</option></datalist>
 
 <script src="/js/vendor/supabase-2.117.2.js"></script>
 <script src="/js/core.js"></script>
 <script src="/js/account.js"></script>
 <script src="/js/app.js"></script>
+<script src="/js/xlsx.js"></script>
 <script src="/js/tracker.js"></script>
+<script src="/js/stock.js"></script>
 
 </body>
 </html>

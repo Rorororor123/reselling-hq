@@ -1,4 +1,5 @@
-// Reselling HQ tracker: the Dashboard and Orders screens, and the order form.
+// Reselling HQ tracker: loading your data, the Dashboard and Orders screens, and the order form.
+// js/stock.js adds the Inventory, Sales and Expenses screens on top of this.
 // Your orders, stock and expenses live in your account (tables from supabase/migrations/002_tracker.sql);
 // the sums come from js/core.js so they can be tested on their own.
 (() => {
@@ -15,7 +16,8 @@ function niceDate(v, now = new Date()) {
   return d.toLocaleDateString("en-GB", d.getFullYear() === now.getFullYear() ? {day: "numeric", month: "short"} : {day: "numeric", month: "short", year: "numeric"});
 }
 const plural = (n, w) => n + " " + w + (n === 1 ? "" : "s");
-const PILL = {"Ordered": "s-ordered", "Shipped": "s-shipped", "Out for delivery": "s-ofd", "Delivered": "s-done", "Cancelled": "s-cancel", "Pre-order": "s-pre", "Sold": "s-sold"};
+const PILL = {"Ordered": "s-ordered", "Shipped": "s-shipped", "Out for delivery": "s-ofd", "Delivered": "s-done", "Cancelled": "s-cancel", "Pre-order": "s-pre", "Sold": "s-sold",
+  "In stock": "s-ordered", "Listed": "s-shipped", "Stale": "s-cancel", "To post": "s-pre", "Monthly": "s-shipped", "Yearly": "s-shipped", "One-off": "s-ordered", "Ended": "s-ordered"};
 const pill = status => `<span class="pill ${PILL[status] || "s-ordered"}">${esc(status)}</span>`;
 function toast(text) {
   let el = $("#toast");
@@ -37,6 +39,7 @@ async function load() {
     T.error = /PGRST205|42P01|does not exist|could not find the table/i.test(m) ? "missing" : "failed";
   }
   renderAll();
+  if (T.items.length) app.setupDone("c-stock");
 }
 function problem() {
   if (T.error === "missing") return `<div class="banner err"><svg class="i"><use href="#i-info"/></svg><div><b>One more setup step: the tracker isn't in your database yet.</b>
@@ -45,8 +48,9 @@ function problem() {
   return `<div class="banner err"><svg class="i"><use href="#i-info"/></svg><div><b>Couldn't load your orders and stock just now.</b> Check your connection, then <button class="linkbtn" type="button" data-reload>try again</button>.</div></div>`;
 }
 document.addEventListener("click", e => { if (e.target.closest("[data-reload]")) load(); });
+const renderers = [];
 function renderAll() {
-  renderDash(); renderOrders();
+  renderDash(); renderOrders(); renderers.forEach(f => f());
   const c = R.orderCounts(T.orders).onTheWay;
   document.querySelectorAll("[data-orders-badge]").forEach(b => { b.textContent = c; b.hidden = !c; });
 }
@@ -69,12 +73,12 @@ function renderDash() {
     <div><span class="eyebrow">${esc(now.toLocaleDateString("en-GB", {weekday: "long", day: "numeric", month: "long"}))}</span>
       <h2>${hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening"}</h2>
       <p>${d ? esc(d) : ""}</p></div>
-    <div class="btnrow"><button class="btn" type="button" id="dashCustomise">Customise</button><button class="btn primary add" type="button" data-add="order"><svg class="i"><use href="#i-plus"/></svg>Add order</button></div></div>`;
+    <div class="btnrow"><button class="btn" type="button" id="dashCustomise">Customise</button><button class="btn primary add" type="button" data-sheet="addSheet" aria-haspopup="dialog"><svg class="i"><use href="#i-plus"/></svg>Add</button></div></div>`;
   if (!T.loaded) { out.innerHTML = head("") + (T.error ? problem() : '<p class="empty">Loading your dashboard…</p>'); return; }
   const S = app.settings(), p = prefs(), d = R.dashboard(T, S, now);
   const on = k => !p.hide.has(k);
   const nothing = !T.orders.length && !T.items.length && !T.expenses.length;
-  const lede = nothing ? "Welcome. Add your first order to get started: it moves into stock with one tap once it's delivered." : d.summary || "Nothing urgent today.";
+  const lede = nothing ? "Welcome. Tap Add to put in an order, some stock, a sale or an expense, or bring in your old tracker from Settings." : d.summary || "Nothing urgent today.";
 
   const tiles = [];
   if (on("profit")) {
@@ -124,10 +128,7 @@ function renderDash() {
   if (on("actions")) {
     const list = d.actions.slice(0, 6), more = d.actions.length - list.length;
     third.push(`<section class="card" data-box="actions"><div class="cardhead"><h3>Needs action</h3>${d.actions.length ? `<span class="count bad">${d.actions.length}</span>` : ""}</div>
-      ${list.length ? `<div class="rowlist">${list.map((a, i) => {
-        const tag = a.kind === "order" || a.kind === "stock" ? "button" : "div";
-        return `<${tag} class="rowitem wrap"${tag === "button" ? ` type="button" data-action="${i}"` : ""}><span class="dot ${a.level}"></span><span class="grow"><span class="t">${esc(a.title)}</span><span class="m">${esc(a.detail)}</span></span></${tag}>`;
-      }).join("")}${more > 0 ? `<p class="sub" style="margin:4px 0 0">and ${more} more</p>` : ""}</div>` : '<p class="empty">Nothing needs doing right now.</p>'}</section>`);
+      ${list.length ? `<div class="rowlist">${list.map((a, i) => `<button class="rowitem wrap" type="button" data-action="${i}"><span class="dot ${a.level}"></span><span class="grow"><span class="t">${esc(a.title)}</span><span class="m">${esc(a.detail)}</span></span></button>`).join("")}${more > 0 ? `<p class="sub" style="margin:4px 0 0">and ${more} more</p>` : ""}</div>` : '<p class="empty">Nothing needs doing right now.</p>'}</section>`);
   }
   if (on("activity")) third.push(`<section class="card" data-box="activity"><div class="cardhead"><h3>Recent activity</h3><button class="linkbtn" type="button" data-tab="orders">All orders</button></div>
     ${d.activity.length ? `<div class="rowlist">${d.activity.map(a => `<div class="rowitem"><span class="grow"><span class="t">${esc(a.title)}</span><span class="m">${esc(a.meta)}</span></span>${pill(a.status)}</div>`).join("")}</div>` : '<p class="empty">Your orders and sales will show here.</p>'}</section>`);
@@ -173,6 +174,9 @@ $("#dashOut").addEventListener("click", e => {
     const act = $("#dashOut")._actions[+a.dataset.action];
     if (act.kind === "order") { const o = T.orders.find(x => x.id === act.id); if (o) openOrder(o); }
     if (act.kind === "stock") app.go("orders", {filter: "delivered"});
+    if (act.kind === "stale" || act.kind === "item") { const i = T.items.find(x => x.id === act.id); if (i && api.openItem) api.openItem(i); }
+    if (act.kind === "post") app.go("sales", {filter: "toPost"});
+    if (act.kind === "backup") app.go("set");
   }
 });
 
@@ -370,6 +374,7 @@ form.querySelector("[data-delete]").addEventListener("click", async () => {
   sheet.close(); renderAll(); toast("Order deleted.");
 });
 
-app.ready.then(load);
-window.RHQTracker = {data: T, reload: load};
+// Shared with js/stock.js and the weekly check in js/app.js.
+const api = window.RHQTracker = {data: T, reload: load, ready: app.ready.then(load), renderAll, onRender: f => renderers.push(f),
+  toast, niceDate, pill, plural, iso, whole, problem, openItem: null};
 })();

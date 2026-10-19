@@ -1,6 +1,6 @@
 # Reselling HQ: build plan
 
-Status: Stages 1 and 2 are done. Stage 3 is built and confirmed on the preview; last check is signing in on the live app after merging. Next up: Stage 4 (built-in tracker and new look), redefined on 19 October 2026 and built in two halves. The stage order changed on 18 October 2026, see section 2.
+Status: Stages 1 and 2 are done. Stage 3 is built and confirmed on the preview; last check is signing in on the live app after merging. Stage 4 (built-in tracker and new look) is built and waiting for your check on the preview; next is Stage 5 (eBay). The stage order changed on 18 October 2026, see section 2.
 All prices are rough guides from October 2026 at about $1 = £0.78. Check the live pricing pages before you rely on them. Tax and money figures are guides, not advice.
 
 ## Things to do now (before Stage 2)
@@ -121,18 +121,23 @@ Built in two halves, with a preview after each:
 1. First half: this plan update, design files moved into `design/`, the database file, the dashboard maths, the new look, the Dashboard and the Orders screen.
 2. Second half: Inventory, Sales, Expenses, the full quick add, Settings changes, the weekly check reading from the tracker, then the optional extras if they stay small.
 
-First half built (19 October 2026), waiting for your check on the preview:
-- **What was built:**
+Built (19 October 2026), both halves. Waiting for your check on the preview.
+- **First half:**
   - `supabase/migrations/002_tracker.sql`: orders, items and expenses tables, plus "move into stock" done in one step.
-  - `js/core.js`: the dashboard maths.
-  - `js/tracker.js`: the Dashboard, the Orders screen and the order form.
-  - The new look in `css/styles.css`, and new purple icons.
+  - The Dashboard and the Orders screen (`js/tracker.js`), and the dashboard maths (`js/core.js`).
+  - The new look and purple icons.
   - On phones: a bottom tab bar, a More menu and a + button.
-  - The weekly check is now its own screen.
-- **Tests (all passing):**
-  - 35 new unit tests, including the security rules for the new tables run in a test database.
-  - 12 new browser tests (adding, moving and stocking orders; dashboard figures, goal, chart and Customise; the setup message).
-- **Your one setup step:** run `002_tracker.sql` in Supabase.
+- **Second half:**
+  - Inventory, Sales and Expenses screens with their forms (`js/stock.js`).
+  - The + button adds an order, stock, a sale or an expense.
+  - The weekly check reads the built-in tracker. The Google Sheet link, "Use CSV files instead" and `api/sheet.js` are gone.
+  - Settings has a monthly goal and a colours choice (match the device, dark or light).
+- **Optional extras (both done):**
+  - **Download backup:** one Excel file with Inventory, Orders, Expenses and Settings tabs. The dashboard reminds you when your last backup is a week old.
+  - **Bring in your old tracker:** Excel or CSV, with a preview, skipping anything already there, so re-importing a backup adds nothing twice.
+  - Both use a small built-in Excel reader and writer (`js/xlsx.js`), not an outside library.
+- **Proven by tests:** the weekly check gives exactly the same numbers from the app's data as from the old Google Sheet.
+- **Tests (all passing):** 121 unit tests and 78 browser tests (phone light, phone dark and desktop).
 
 Done when: you can add orders, move them into stock, sell items and log expenses on your phone; the dashboard and weekly check show the right numbers from the app's own data; and another account can't see any of it (proven by an automated test).
 
@@ -320,7 +325,7 @@ Notes:
 - [x] Stage 1: Plan
 - [x] Stage 2: Foundations
 - [ ] Stage 3: Accounts and private data (only you). Confirmed on the preview; tick once sign-in works on the live app
-- [ ] Stage 4: Built-in tracker and new look (first half: dashboard and orders; second half: inventory, sales, expenses, weekly check from the tracker)
+- [ ] Stage 4: Built-in tracker and new look. Built; tick once you've checked it on the preview and merged
 - [ ] Stage 5: eBay sync for your account
 - [ ] Stage 6: Vinted sales and retailer order emails via email forwarding on your own domain, plus manual entry
 - [ ] Stage 7: Claude usage limits

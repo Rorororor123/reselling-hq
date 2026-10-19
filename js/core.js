@@ -315,6 +315,13 @@ function dashboard({items = [], orders = [], expenses = []}, settings = {}, now 
     if (isSold(i) && (!i.sold || money(i.sale_price) == null)) actions.push({level: "info", kind: "item", id: i.id, title: `${i.name} is sold but missing ${!i.sold ? "the sale date" : "the sale price"}`, detail: "Add it so it counts in your profit"});
   }
 
+  // Supabase Free keeps no backups, so nudge once a week.
+  if (items.length + orders.length + expenses.length) {
+    const last = settings.lastBackup ? new Date(settings.lastBackup) : null, age = last ? daysBetween(last, today) : null;
+    if (!last || age >= 7) actions.push({level: "info", kind: "backup", title: last ? `Your last backup was ${age} days ago` : "Download your first backup",
+      detail: "Settings, Download backup: saves everything as one Excel file"});
+  }
+
   const breakdown = key => {
     const m = new Map();
     for (const s of inRange(TY.start, TY.end)) { const k = label(s[key]); const g = m.get(k.toLowerCase()) || {name: k, profit: 0, revenue: 0, count: 0}; g.profit += s.profit; g.revenue += s.rev; g.count++; m.set(k.toLowerCase(), g); }
@@ -333,7 +340,160 @@ function dashboard({items = [], orders = [], expenses = []}, settings = {}, now 
     summary: summary.length ? summary.join(" and ").replace(/ and (?=.* and )/g, ", ") + "." : ""};
 }
 
+/* ---------- weekly check, stock and sales screens ---------- */
+// The weekly check from the built-in tracker: the same row shape the old sheet gave crunch().
+// Monthly and yearly expenses count once for every time they've come round, up to today.
+function trackerToCrunch(items = [], expenses = [], now = new Date()) {
+  const inv = items.map(i => ({id: i.id, name: i.name, category: i.category || "", size: i.size || "", cost: money(i.cost) || 0,
+    status: i.status || "", listed: parseDate(i.listed), bought: parseDate(i.bought), platform: i.platform || "",
+    sold: parseDate(i.sold), sale: isSold(i) ? money(i.sale_price) : null, fees: money(i.fees) || 0, post: money(i.postage) || 0}));
+  const exp = expenses.flatMap(e => expenseDates(e, new Date(2000, 0, 1), now).map(d => ({date: d, desc: e.description, cat: e.category || "", amount: num(e.amount)})));
+  return {inv, exp};
+}
+
+// How long a listed item has been up, against your stale limit (sealed Pokémon has its own).
+function itemAge(i, settings = {}, now = new Date()) {
+  const listed = parseDate(i.listed), limit = /pok/i.test(i.category) ? num(settings.stalePk) || 90 : num(settings.stale) || 30;
+  const days = listed && i.status === "Listed" ? daysBetween(listed, now) : null;
+  return {days, limit, stale: days != null && days > limit};
+}
+function itemFilter(filter, settings, now = new Date()) {
+  return {
+    unsold: i => !isSold(i),
+    inStock: i => i.status === "In stock",
+    listed: i => i.status === "Listed",
+    stale: i => itemAge(i, settings, now).stale,
+    sold: isSold,
+  }[filter] || (i => !isSold(i));
+}
+function itemMatches(i, q) {
+  q = nameKey(q); if (!q) return true;
+  return [i.name, i.category, i.size, i.platform, i.notes].some(v => nameKey(v).includes(q));
+}
+
+// The Sales screen: sold items in a period, newest first, with totals.
+const SALE_PERIODS = {month: "This month", "30d": "Last 30 days", ty: "This tax year", all: "All time"};
+function salesView(items, {period = "month", platform = "", toPost = false} = {}, now = new Date()) {
+  const TY = taxYear(now), today = day0(now);
+  const from = {month: monthStart(now), "30d": addDays(today, -29), ty: TY.start}[period] || null;
+  const rows = items.filter(isSold).filter(i => {
+    const d = parseDate(i.sold);
+    if (toPost) return !i.posted;
+    if (from && (!d || d < from)) return false;
+    return !platform || nameKey(i.platform) === nameKey(platform);
+  }).map(i => ({...i, profit: saleProfit(i)}))
+    .sort((a, b) => String(b.sold || "").localeCompare(String(a.sold || "")) || String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
+  const sum = f => rows.reduce((t, r) => t + (f(r) || 0), 0);
+  const byKey = new Map();
+  for (const i of items.filter(isSold)) { const p = label(i.platform, ""); if (p && !byKey.has(nameKey(p))) byKey.set(nameKey(p), p); }
+  const platforms = [...byKey.values()].sort((a, b) => a.localeCompare(b, "en-GB", {sensitivity: "base"}));
+  return {rows, platforms, toPost: items.filter(i => isSold(i) && !i.posted).length,
+    totals: {count: rows.length, revenue: sum(r => money(r.sale_price)), profit: sum(r => r.profit), fees: sum(r => money(r.fees)), postage: sum(r => money(r.postage))}};
+}
+
+// The Expenses screen list: newest first, with what each one costs a month.
+function expenseRows(expenses, now = new Date()) {
+  const today = day0(now);
+  return expenses.map(e => {
+    const end = parseDate(e.end_date), active = (e.repeat === "monthly" || e.repeat === "yearly") && parseDate(e.date) <= today && (!end || end >= today);
+    return {...e, active, ended: (e.repeat === "monthly" || e.repeat === "yearly") && end && end < today};
+  }).sort((a, b) => (b.active - a.active) || String(b.date).localeCompare(String(a.date)));
+}
+
+/* ---------- bringing in an old tracker, and backups ---------- */
+// Each text is one table: a CSV file, or one tab of an Excel file turned into tab-separated text.
+// Reads Inventory (needs an "Item Name" column), Expenses ("Amount") and Orders ("Order Date") tables.
+const yes = v => /^(y|yes|true|1|✓|x)$/i.test(String(v).trim());
+const isoOf = v => { const d = parseDate(v); return d && !isNaN(d) ? d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") : null; };
+const blankOr = (v, f) => String(v ?? "").trim() === "" ? null : f(v);
+const has = (row, k) => Object.keys(row).some(h => h.startsWith(k));
+function parseImport(texts) {
+  const txt = (v, n) => String(v ?? "").trim().slice(0, n); // the database's length limits
+  const out = {items: [], expenses: [], orders: [], tables: 0};
+  for (const text of texts) {
+    const inv = tableFrom(text, "item name");
+    if (inv) {
+      out.tables++;
+      for (const r of inv) {
+        const name = txt(pick(r, "item name", "item", "name"), 300), id = txt(pick(r, "item id"), 120);
+        if (!name || /^example/i.test(name) || /^ex-/i.test(id)) continue;
+        const sale = blankOr(pick(r, "sale price"), num), st = String(pick(r, "status"));
+        const status = sale != null || /sold/i.test(st) ? "Sold" : /listed/i.test(st) ? "Listed" : "In stock";
+        out.items.push({name: name.slice(0, 300), category: txt(pick(r, "category"), 80), size: txt(pick(r, "size"), 120),
+          cost: blankOr(pick(r, "cost"), num), status, bought: isoOf(pick(r, "date bought")), listed: isoOf(pick(r, "date listed")),
+          ask_price: blankOr(pick(r, "asking price"), num), platform: txt(pick(r, "platform"), 40), sold: status === "Sold" ? isoOf(pick(r, "date sold")) : null,
+          sale_price: status === "Sold" ? sale : null, fees: num(pick(r, "platform fees", "fees")), postage: num(pick(r, "postage")),
+          posted: has(r, "posted") ? yes(pick(r, "posted")) : true, // old sales were posted long ago
+          notes: txt(pick(r, "notes"), 2000), import_id: id || null});
+      }
+      continue;
+    }
+    const ord = tableFrom(text, "order date");
+    if (ord) {
+      out.tables++;
+      for (const r of ord) {
+        const item = txt(pick(r, "item"), 300); if (!item) continue;
+        const st = ORDER_STATUSES.find(s => nameKey(s) === nameKey(pick(r, "status"))) || "Ordered";
+        out.orders.push({item: item.slice(0, 300), shop: txt(pick(r, "shop"), 120), order_ref: txt(pick(r, "order number", "order ref"), 120),
+          ordered: isoOf(pick(r, "order date")) || isoOf(new Date()), qty: Math.min(500, Math.max(1, Math.round(num(pick(r, "quantity", "qty")) || 1))),
+          cost: num(pick(r, "total cost", "cost")), status: st, courier: txt(pick(r, "courier"), 80), tracking: txt(pick(r, "tracking"), 120),
+          preorder: yes(pick(r, "pre-order", "preorder")), release: isoOf(pick(r, "release")), category: txt(pick(r, "category"), 80),
+          size: txt(pick(r, "size"), 120), notes: txt(pick(r, "notes"), 2000), stocked_at: blankOr(pick(r, "added to stock"), v => isoOf(v) ? isoOf(v) + "T12:00:00Z" : null)});
+      }
+      continue;
+    }
+    const exp = tableFrom(text, "amount");
+    if (exp) {
+      out.tables++;
+      for (const r of exp) {
+        const description = txt(pick(r, "description"), 300), amount = num(pick(r, "amount")), date = isoOf(pick(r, "date"));
+        if (!description || !amount || !date || /^example/i.test(description)) continue;
+        const rep = String(pick(r, "repeats", "repeat", "how often")).toLowerCase();
+        out.expenses.push({date, description: description.slice(0, 300), category: txt(pick(r, "category"), 80) || "Other", amount,
+          repeat: /month/.test(rep) ? "monthly" : /year|annual/.test(rep) ? "yearly" : "once", end_date: isoOf(pick(r, "end date")),
+          deductible: has(r, "tax") ? yes(pick(r, "tax")) : true, notes: txt(pick(r, "notes"), 2000)});
+      }
+    }
+  }
+  return out;
+}
+// Leaves out anything already in your tracker (or twice in the file), so importing again adds nothing new.
+const importKeys = {
+  items: i => i.import_id ? "id:" + nameKey(i.import_id) : "n:" + nameKey(i.name) + "|" + (i.bought || "") + "|" + (i.sold || "") + "|" + (money(i.cost) ?? ""),
+  expenses: e => nameKey(e.description) + "|" + e.date + "|" + num(e.amount).toFixed(2),
+  orders: o => nameKey(o.item) + "|" + o.ordered + "|" + nameKey(o.order_ref) + "|" + num(o.cost).toFixed(2),
+};
+function planImport(existing, incoming) {
+  const plan = {};
+  for (const t of ["items", "expenses", "orders"]) {
+    const seen = new Set((existing[t] || []).map(importKeys[t]));
+    if (t === "items") for (const i of existing.items || []) seen.add("id:" + nameKey(i.id));
+    const fresh = [];
+    for (const r of incoming[t] || []) { const k = importKeys[t](r); if (seen.has(k)) continue; seen.add(k); fresh.push(r); }
+    plan[t] = {add: fresh, skipped: (incoming[t] || []).length - fresh.length};
+  }
+  return plan;
+}
+
+// The Download backup file: one tab each, with headers the importer reads back.
+function backupSheets({items = [], orders = [], expenses = []}, settings = {}) {
+  const d = v => { const x = parseDate(v); return x ? x.toLocaleDateString("en-GB") : ""; };
+  const n = v => money(v) ?? "";
+  const yn = v => v ? "Yes" : "No";
+  const {setup, ...plain} = settings;
+  return [
+    {name: "Inventory", rows: [["Item ID", "Item Name", "Category", "Size/Details", "Cost (£)", "Status", "Date Bought", "Date Listed", "Asking Price (£)", "Platform Sold On", "Date Sold", "Sale Price (£)", "Platform Fees (£)", "Postage (£)", "Posted", "Notes"],
+      ...items.map(i => [i.import_id || i.id, i.name, i.category, i.size, n(i.cost), i.status, d(i.bought), d(i.listed), n(i.ask_price), i.platform, d(i.sold), n(i.sale_price), n(i.fees), n(i.postage), yn(i.posted), i.notes])]},
+    {name: "Orders", rows: [["Item", "Shop", "Order Number", "Order Date", "Quantity", "Total Cost (£)", "Status", "Courier", "Tracking", "Pre-order", "Release Date", "Category", "Size/Details", "Added To Stock", "Notes"],
+      ...orders.map(o => [o.item, o.shop, o.order_ref, d(o.ordered), o.qty, n(o.cost), o.status, o.courier, o.tracking, yn(o.preorder), d(o.release), o.category, o.size, o.stocked_at ? d(String(o.stocked_at).slice(0, 10)) : "", o.notes])]},
+    {name: "Expenses", rows: [["Date", "Description", "Category", "Amount (£)", "Repeats", "End Date", "Tax-deductible", "Notes"],
+      ...expenses.map(e => [d(e.date), e.description, e.category, n(e.amount), {monthly: "Monthly", yearly: "Yearly"}[e.repeat] || "One-off", d(e.end_date), yn(e.deductible !== false), e.notes])]},
+    {name: "Settings", rows: [["Setting", "Value"], ...Object.entries(plain).map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : v])]},
+  ];
+}
+
 const RHQ = {esc, gbp, DAY, taxYear, looseJson, parseDate, num, splitLine, tableFrom, pick, normInventory, normExpenses, crunch,
-  ORDER_STATUSES, ON_THE_WAY, PERIODS, isPreorder, orderLabel, orderStep, nextStatus, orderCounts, orderFilter, orderMatches, saleProfit, expenseDates, chartSeries, dashboard};
+  ORDER_STATUSES, ON_THE_WAY, PERIODS, isPreorder, orderLabel, orderStep, nextStatus, orderCounts, orderFilter, orderMatches, saleProfit, expenseDates, chartSeries, dashboard,
+  trackerToCrunch, itemAge, itemFilter, itemMatches, SALE_PERIODS, salesView, expenseRows, parseImport, planImport, backupSheets};
 if (typeof module === "object" && module.exports) module.exports = RHQ; else root.RHQ = RHQ;
 })(typeof self !== "undefined" ? self : this);
