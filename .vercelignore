@@ -6,3 +6,4 @@ playwright-report/
 .github/
 vitest.config.js
 supabase/
+design/

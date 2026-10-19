@@ -4,7 +4,6 @@ import claude from "../api/claude.js";
 import health from "../api/health.js";
 import account from "../api/account.js";
 import config from "../api/config.js";
-import sheet from "../api/sheet.js";
 
 function fakeRes() {
   const res = { statusCode: 0, body: null, headers: {} };
@@ -143,27 +142,6 @@ describe("api/claude.js", () => {
     await claude(post({ prompt: "hi" }), res);
     expect(res.statusCode).toBe(502);
     expect(claudeFetch).not.toHaveBeenCalled();
-  });
-});
-
-describe("api/sheet.js", () => {
-  beforeEach(() => Object.assign(process.env, SB));
-  afterEach(() => { vi.unstubAllGlobals(); for (const k of Object.keys(SB)) delete process.env[k]; });
-
-  it("needs a signed-in, allowed account", async () => {
-    const google = vi.fn(); vi.stubGlobal("fetch", signedIn(google));
-    const res = fakeRes();
-    await sheet({ method: "GET", headers: {}, query: { url: "https://docs.google.com/spreadsheets/d/e/x/pub?output=csv" } }, res);
-    expect(res.statusCode).toBe(401);
-    expect(google).not.toHaveBeenCalled();
-  });
-
-  it("reads the sheet when signed in", async () => {
-    vi.stubGlobal("fetch", signedIn(vi.fn(async () => ({ ok: true, status: 200, text: async () => "Item Name,Cost\nA,1" }))));
-    const res = fakeRes();
-    await sheet({ method: "GET", headers: { authorization: "Bearer good-token" }, query: { url: "https://docs.google.com/spreadsheets/d/e/x/pub?output=csv" } }, res);
-    expect(res.statusCode).toBe(200);
-    expect(res.body.text).toBe("Item Name,Cost\nA,1");
   });
 });
 
@@ -362,7 +340,7 @@ describe("sw.js", () => {
     const shell = JSON.parse(src.match(/const SHELL = (\[.*?\]);/)[1]);
     expect(shell).toEqual(expect.arrayContaining(["/css/styles.css", "/js/core.js", "/js/app.js"]));
     for (const p of shell) if (p !== "/") expect(fs.existsSync(new URL(".." + p, import.meta.url)), p).toBe(true);
-    expect(shell).toEqual(expect.arrayContaining(["/js/account.js", "/js/vendor/supabase-2.117.2.js"]));
-    expect(src).toContain('const CACHE = "rhq-v3"');
+    expect(shell).toEqual(expect.arrayContaining(["/js/account.js", "/js/tracker.js", "/js/stock.js", "/js/xlsx.js", "/js/vendor/supabase-2.117.2.js"]));
+    expect(src).toContain('const CACHE = "rhq-v5"');
   });
 });

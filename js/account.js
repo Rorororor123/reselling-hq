@@ -181,13 +181,19 @@ $("#accPwForm").addEventListener("submit", async e => {
 $("#accDownload").addEventListener("click", async () => {
   const msg = $("#accMsg");
   try {
-    const [p, s, r] = await Promise.all([
+    const [p, s, r, o, i, x] = await Promise.all([
       client.from("profiles").select("*").maybeSingle(),
       client.from("settings").select("*").maybeSingle(),
       client.from("reports").select("*").order("ts", { ascending: false }),
+      client.from("orders").select("*"),
+      client.from("items").select("*"),
+      client.from("expenses").select("*"),
     ]);
-    for (const x of [p, s, r]) if (x.error) throw x.error;
-    const file = { app: "Reselling HQ", exported: new Date().toISOString(), account: { id: user.id, email: user.email }, profile: p.data, settings: s.data, reports: r.data };
+    for (const q of [p, s, r]) if (q.error) throw q.error;
+    // The tracker tables only exist once 002_tracker.sql has been run.
+    const rows = q => (q.error ? [] : q.data);
+    const file = { app: "Reselling HQ", exported: new Date().toISOString(), account: { id: user.id, email: user.email }, profile: p.data, settings: s.data, reports: r.data,
+      orders: rows(o), items: rows(i), expenses: rows(x) };
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([JSON.stringify(file, null, 2)], { type: "application/json" }));
     a.download = "reselling-hq-my-data-" + new Date().toISOString().slice(0, 10) + ".json";
@@ -199,7 +205,7 @@ $("#accDownload").addEventListener("click", async () => {
 });
 $("#accDelete").addEventListener("click", async () => {
   const msg = $("#accMsg");
-  const typed = prompt("This deletes your Reselling HQ account, settings and every saved report, for good. It can't be undone.\n\nType DELETE to confirm.");
+  const typed = prompt("This deletes your Reselling HQ account, settings, every saved report and all your orders, stock and expenses, for good. It can't be undone.\n\nType DELETE to confirm.");
   if (typed === null) return;
   if (typed.trim().toUpperCase() !== "DELETE") { msg.textContent = "Not deleted: you need to type DELETE."; return; }
   msg.textContent = "Deleting…";
@@ -216,6 +222,9 @@ $("#accDelete").addEventListener("click", async () => {
   gate("out", "Your account and all its data have been deleted.");
 });
 
-window.RHQAccount = { ready, token, saveSettings, reports };
+// The tracker tables (orders, items, expenses). The database rules limit these to your own rows.
+const from = table => client.from(table);
+const rpc = (fn, args) => client.rpc(fn, args);
+window.RHQAccount = { ready, token, saveSettings, reports, from, rpc };
 start().catch(() => gate("broken", "Couldn't start sign-in. Reload the page."));
 })();

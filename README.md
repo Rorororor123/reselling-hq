@@ -36,26 +36,25 @@ Your own website for the weekly check, listing writer and buyer replies. You can
 
 Optional: if a Claude model name ever stops working, add `CLAUDE_MODEL` (for the weekly check and listings) or `CLAUDE_MODEL_FAST` (for buyer replies) with a current model name from the Claude docs, then redeploy.
 
-## Step 4: Link your Google Sheet (5 minutes)
+## Step 4: Bring in your old tracker (optional, 5 minutes)
 
-1. Open your Reselling Tracker in Google Sheets.
-2. Click **File, Share, Publish to web**.
-3. In the first box choose **Inventory**, in the second choose **Comma-separated values (.csv)**, and click **Publish**. Copy the link.
-4. Do the same for the **Expenses** tab and copy that link too.
-5. Open your app, sign in, tap the **cog** (Settings) and paste both links. Click **Save settings**.
+1. If your old tracker is a Google Sheet, open it and click **File, Download, Microsoft Excel (.xlsx)**.
+2. Open your app, sign in, go to **Settings** and click **Choose files** under **Bring in your old tracker**.
+3. Pick the file. The app shows how many stock items, sales and expenses it found; click **Add them**.
 
-A published tab can be opened by anyone who has the exact link, though it isn't listed or searchable. Keep the links private. You can stop publishing at any time from the same menu.
+It skips anything already in the app, so it's safe to do twice. Once it's in, you can stop publishing the old sheet (in the sheet: **File, Share, Publish to web, Stop publishing**).
 
 ## Step 5: Install it on your phone (1 minute)
 
 - **iPhone:** open your app link in Safari, tap **Share**, then **Add to Home Screen**.
 - **Android:** open it in Chrome, tap the **menu**, then **Install app** (or **Add to Home screen**).
 
-Sign in once on each device. Your settings and report history are saved in your account, so every device shows the same thing.
+Sign in once on each device. Your stock, sales, settings and report history are saved in your account, so every device shows the same thing.
 
 ## Using it
 
-- **Every week:** open the app and press **Run my weekly check**. It reads your sheet, works out profit and stale stock, and Claude searches the web for upcoming drops, sold prices and niche ideas. It takes 1 to 2 minutes.
+- **Day to day:** add orders when you buy, move them into stock when they arrive, and record sales and expenses. On a phone the **+** button does all of these.
+- **Every week:** open the app and press **Run my weekly check**. It reads your stock, sales and expenses from the app, works out profit and stale stock, and Claude searches the web for upcoming drops, sold prices and niche ideas. It takes 1 to 2 minutes.
 - **Listings:** add photos and a line of notes, tap **Write listing**, then copy.
 - **Replies:** paste a buyer's message with your price and cost, tap **Draft reply**, then copy.
 
@@ -80,7 +79,7 @@ Sign-in and your saved data live in Supabase (London region). The database only 
 
 **Supabase, one time:**
 
-1. **SQL Editor, New query**: paste all of `supabase/migrations/001_accounts.sql`, click **Run**.
+1. **SQL Editor, New query**: paste all of `supabase/migrations/001_accounts.sql`, click **Run**. Then do the same with `supabase/migrations/002_tracker.sql` (your orders, stock and expenses, from Stage 4).
 2. Add your email to the allow list (SQL Editor): `insert into public.allowed_emails (email) values ('you@example.com') on conflict do nothing;`
 3. **Authentication, Hooks**: add a **Before User Created** hook, type **Postgres**, schema `public`, function `hook_before_user_created`.
 4. **Authentication, URL Configuration**: Site URL = your live address; Redirect URLs = your live address and your preview address pattern.
@@ -93,13 +92,15 @@ Check it any time at `your-link/api/health`: `"supabase":"ok"` and `"accounts":"
 ## Files
 
 - `index.html`: the screens
-- `css/styles.css`: the look (teal and yellow, light and dark mode)
-- `js/core.js`: the weekly check maths and tracker reading
+- `css/styles.css`: the look (black and purple, light and dark mode; the designs it follows are in `design/`, which isn't published)
+- `js/core.js`: the weekly check and dashboard maths, and tracker reading
+- `js/tracker.js`: the Dashboard and Orders screens and the order form
+- `js/stock.js`: the Inventory, Sales and Expenses screens, Download backup and bringing in an old tracker
+- `js/xlsx.js`: reads and writes Excel files for the backup and the import
 - `js/app.js`: everything that happens when you tap things
 - `js/account.js`: sign in, your settings and reports in your account, download my data, delete my account
 - `js/vendor/`: Supabase's sign-in library (a pinned copy, so the app doesn't depend on another website)
 - `api/claude.js`: sends requests to Claude using your secret key (signed-in, allowed accounts only)
-- `api/sheet.js`: reads your published sheet tabs (signed-in, allowed accounts only)
 - `api/account.js`: deletes your account and all its data
 - `api/config.js`: tells the app where Supabase is
 - `api/_supabase.js`: shared sign-in checks for the files above
