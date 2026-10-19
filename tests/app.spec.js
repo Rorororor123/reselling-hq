@@ -20,6 +20,7 @@ const analysis = {
 const visible = (page, sel) => page.locator(sel).filter({ visible: true }).first();
 // Opens a screen the way a person would: the sidebar on a computer, the tab bar (or More) on a phone.
 async function openTab(page, tab, filter) {
+  await expect(page.locator(".shell")).toBeVisible(); // sign-in has finished, so the menus are on screen
   const sel = `[data-tab="${tab}"]` + (filter ? `[data-filter="${filter}"]` : ":not([data-filter])");
   const direct = page.locator(`nav.menu ${sel}, nav.tabbar ${sel}, .mobilebar ${sel}, .railfoot ${sel}`).filter({ visible: true });
   if (await direct.count()) await direct.first().click();

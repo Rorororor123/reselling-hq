@@ -17,6 +17,7 @@ test.afterEach(async ({ page }) => expect(page.errors).toEqual([]));
 
 const isPhone = page => page.viewportSize().width < 760;
 async function open(page, tab) {
+  await expect(page.locator(".shell")).toBeVisible(); // sign-in has finished, so the menus are on screen
   const direct = page.locator(`nav.menu [data-tab="${tab}"]:not([data-filter]), nav.tabbar [data-tab="${tab}"], .mobilebar [data-tab="${tab}"], .railfoot [data-tab="${tab}"]`).filter({ visible: true });
   if (await direct.count()) await direct.first().click();
   else { await page.click('nav.tabbar [data-sheet="moreSheet"]'); await page.click(`#moreSheet [data-tab="${tab}"]`); }
