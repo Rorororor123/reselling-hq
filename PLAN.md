@@ -1,6 +1,6 @@
 # Reselling HQ: build plan
 
-Status: Stages 1 and 2 are done. Stage 3 is built and confirmed on the preview; last check is signing in on the live app after merging. Next up: Stage 4 (built-in tracker). The stage order changed on 18 October 2026, see section 2.
+Status: Stages 1 and 2 are done. Stage 3 is built and confirmed on the preview; last check is signing in on the live app after merging. Next up: Stage 4 (built-in tracker and new look), redefined on 19 October 2026 and built in two halves. The stage order changed on 18 October 2026, see section 2.
 All prices are rough guides from October 2026 at about $1 = £0.78. Check the live pricing pages before you rely on them. Tax and money figures are guides, not advice.
 
 ## Things to do now (before Stage 2)
@@ -27,7 +27,7 @@ All prices are rough guides from October 2026 at about $1 = £0.78. Check the li
 - `api/sheet.js`: reads your published Google Sheet tabs.
 - Hosted free on Vercel. You pay Claude per use.
 
-We keep what works (the weekly check maths, the prompts, the listing writer, the reply drafter, the teal and yellow look, light and dark mode, installing on phones) and build the public app around it, one stage at a time.
+We keep what works (the weekly check maths, the prompts, the listing writer, the reply drafter, light and dark mode, installing on phones) and build the public app around it, one stage at a time. From Stage 4 the look changes to black and purple (the design files in `design/`).
 
 ## 1. Recommended tech stack and hosting
 
@@ -35,7 +35,7 @@ We keep what works (the weekly check maths, the prompts, the listing writer, the
 |---|---|---|
 | Hosting and server code | **Vercel** (what you already use) | Every GitHub push gets its own preview link automatically. No servers to look after. |
 | Database, logins, file storage | **Supabase** (London region) | One dashboard for user accounts and the database. Its "row level security" means the database itself stops one user reading another user's data. |
-| App code | Keep the current plain HTML and JavaScript, split into a few files, with no build step | Keeps your current design exactly as it is and avoids a full rewrite. Small libraries only where they save real work: Supabase's client, Papa Parse (CSV) and SheetJS (Excel). |
+| App code | Keep the current plain HTML and JavaScript, split into a few files, with no build step | Avoids a full rewrite and a build step. Small libraries only where they save real work: Supabase's client, Papa Parse (CSV) and SheetJS (Excel). |
 | Claude | Claude API through the official Anthropic SDK, on the server only | Your key never reaches a phone. Sonnet 5.5 for the weekly check and listings, Haiku 5.5 for buyer replies (as now). |
 | Payments | **Stripe** (Checkout plus the Customer Portal) | Stripe hosts the payment and "manage my plan" pages, so we never handle card details. |
 | Emails (login links, backups, receipts) | **Resend**, sending from your own domain | Supabase's built-in email is for testing only and won't email real users. |
@@ -95,15 +95,33 @@ Done when: two test accounts (both yours) can't see each other's data (proven by
 
 Built (18 October 2026). Confirmed on the preview (19 October): sign-in works, a second test account saw none of your data and deleting it removed it, and the Supabase settings are ticked for Production too. Last check: sign in on the live app after merging. What was built: `supabase/migrations/001_accounts.sql` (tables, security rules, allow list, sign-up check), `js/account.js` (sign-in screen, settings and reports in your account, move old data, download, delete), `api/_supabase.js` (every server function checks the sign-in and the allow list), `api/account.js` (delete), `api/config.js`. 72 unit tests (including 11 that run the real security rules in a test database and prove one account can't see, change or delete another's rows) and 42 browser tests (phone light/dark and desktop, against a pretend Supabase) pass. `/api/health` now also reports `accounts`. `APP_PASSWORD` is no longer used; delete it from Vercel only once sign-in works on the live app.
 
-### Stage 4: Built-in tracker (only you use the app)
-- Inventory and Expenses tables in the database, with the same columns as your current Google Sheet.
-- An editable grid on desktop and a card view on phones (tap an item to edit it, quick "mark as sold" button).
-- Import from CSV, Excel (.xlsx) or a Google Sheet export, with a step to match columns and a preview before anything is saved. Duplicate checks on re-import. This is a one-off move-in for your existing tracker: after that, everything is tracked in the app and sales arrive from eBay (Stage 5) and Vinted (Stage 6).
-- Export to CSV and Excel at any time.
-- The weekly check reads from the built-in spreadsheet. The Google Sheet link stays as an import option.
-- **Backups (because Supabase Free has none):** a **Download backup** button that saves all your data as one Excel file (one tab each for Inventory, Expenses, Sales and Settings). This button stays for good. The app reminds you if you haven't downloaded one for a week. (The automatic emailed weekly backup is now in Stage 8.)
+### Stage 4: Built-in tracker and new look (only you use the app)
+Redefined on 19 October 2026: **no spreadsheets.** Everything is managed inside the app with screens, forms and cards. The look and layout follow the design files in `design/` (`Main.dc.html`, `Orders.dc.html`, `Phone.dc.html`): black and purple, Bricolage Grotesque headings, Figtree text, IBM Plex Mono numbers, with a matching light mode. The teal and yellow theme is replaced everywhere. The numbers in the design files are examples only; the app shows your own data. Our own original design, not copied from any other app.
 
-Done when: you can import your real tracker, edit on your phone, export again with no data lost, the weekly check gives the same numbers as from your Google Sheet today, and a downloaded backup can be re-imported.
+- **Database:** Items (stock and sales), Orders and Expenses tables, each private to its owner (row level security), deleted with the account.
+- **Dashboard (home screen):**
+  - Profit for this week, this month and this tax year, with a revenue and profit chart (7 days, 30 days, 90 days, this month, all time; show revenue, profit or both).
+  - Pending orders: how many are on the way, money committed, age of the oldest.
+  - Stock: items held, cost, estimated value.
+  - Pre-orders: a separate status for paid-but-not-released items.
+  - Monthly profit goal with a progress ring.
+  - Best seller this month (by units, profit or revenue).
+  - Expenses overview: one-off vs recurring (subscriptions, proxies, software), this month's total, biggest cost, tax-deductible total.
+  - Recent activity feed (orders, sales, pre-orders with status labels).
+  - A "needs action" list (stale listings, sales to post, missing info).
+  - Breakdown by platform and by category.
+  - Choose which dashboard boxes show.
+  - Phone-friendly, matching `Phone.dc.html`, with a bottom tab bar and a + button for quick adding.
+- **Orders screen** (matching `Orders.dc.html`): counts per status, filters, search, and each order with shop, order number, date, cost, courier, tracking number and a progress bar. Orders are added by hand for now; a delivered order moves into stock with one tap.
+- **Inventory, Sales and Expenses screens** with cards and forms (tap to edit, quick "mark as sold", "mark posted"), and Expenses that can be one-off, monthly or yearly, tax-deductible or not.
+- **The weekly check reads the built-in tracker.** The Google Sheet link and "Use CSV files instead" are removed from the weekly check and Settings.
+- **Optional extras only:** bring in an old tracker from a CSV file (with a preview and duplicate check), and a Download backup button (Excel). The automatic emailed weekly backup is in Stage 8.
+
+Built in two halves, with a preview after each:
+1. First half: this plan update, design files moved into `design/`, the database file, the dashboard maths, the new look, the Dashboard and the Orders screen.
+2. Second half: Inventory, Sales, Expenses, the full quick add, Settings changes, the weekly check reading from the tracker, then the optional extras if they stay small.
+
+Done when: you can add orders, move them into stock, sell items and log expenses on your phone; the dashboard and weekly check show the right numbers from the app's own data; and another account can't see any of it (proven by an automated test).
 
 ### Stage 5: eBay sync (your account first)
 - "Connect eBay" button using eBay's official OAuth sign-in (the user logs in on eBay's own site, we never see their password).
@@ -133,10 +151,11 @@ Done when: a sandbox account's sales, fees and postage import correctly with no 
   9. Tick **Forward it to**, choose your Reselling HQ address, and click **Create filter**.
   10. Back in Reselling HQ, click **Send a test**: the app tells you once it receives a Vinted email.
   If the code doesn't show up within 5 minutes, the screen offers a "Resend from Gmail" tip and a check list.
+- **Retailer order emails too:** order confirmations, shipping, out for delivery, delivered and cancellation emails forwarded from shops update the Orders screen, with the statuses Ordered, Shipped, Out for delivery, Delivered and Cancelled. A new order email creates the order; later emails move it along by order number.
 - **Vinted CSV import** (from the data Vinted lets you download) and quick manual entry.
-- Tests built from anonymised copies of your real Vinted emails, so we spot it quickly if Vinted changes its email layout. Anything we can't read goes into a "please check" list rather than being guessed.
+- Tests built from anonymised copies of your real Vinted emails, so we spot it quickly if Vinted changes its email layout. Any email (Vinted or retailer) we can't read goes into a "please check" list rather than being guessed.
 
-Done when: the Gmail confirmation email is caught and its code shown (tested with a sample confirmation email), sample Vinted emails turn into correct sales, unreadable emails land in the check list, and CSV and manual entry work. No Google approval is needed for any of this.
+Done when: the Gmail confirmation email is caught and its code shown (tested with a sample confirmation email), sample Vinted emails turn into correct sales, sample retailer emails create and update orders, unreadable emails land in the check list, and CSV and manual entry work. No Google approval is needed for any of this.
 
 ### Stage 7: Claude usage limits and cost tracking (must be done before anyone else uses the app)
 - Every Claude call goes through one server function that checks the user's plan and what they've used this month, then records the tokens used (from Claude's own usage figures).
@@ -192,6 +211,24 @@ Done when: a test card upgrades an account, limits change straight away, cancell
 - Update README and the in-app help for the new public app.
 
 Done when: the security checklist passes, live keys are in, a real person can sign up, import, connect eBay, run a weekly check and pay, all on a phone.
+
+### Optional stages (any time after the stages they depend on)
+
+#### Stage 14 (optional): orders from your bot's Discord webhook
+- Each user gets a private webhook address in Settings to paste into their checkout bot as a Discord webhook. Successful checkout messages are logged as orders (status Ordered) with shop, item, size, price and order number where the message has them.
+- Anything the app can't read goes to the "please check" list. The address can be reset at any time, which stops the old one working.
+
+Done when: sample webhook messages from your bot become correct orders, duplicates are ignored, and a reset address stops working.
+
+#### Stage 15 (optional): "Share a win" image
+- A button on the Sales screen makes an image of recent sales (item, platform, profit or just "sold", your choice) to save or share to Discord. Made on your phone, no Claude cost. No buyer details, ever.
+
+Done when: the image looks right on phone and desktop and shows only what you chose.
+
+#### Stage 16 (optional, needs Stage 7): "Ask the assistant"
+- A box on the dashboard that answers questions about your own data ("what was my best month?", "how much have I spent on proxies this tax year?") using Claude. Only your own figures are sent, and each question counts towards the usage limits from Stage 7.
+
+Done when: answers match the app's own numbers for a set of test questions, and questions are counted and capped.
 
 ## 3. Accounts you'll need, and when
 
@@ -254,7 +291,7 @@ The first draft (£5.99 with 100 listings) broke this: worst case Claude £4.30 
 | Weekly checks (with web search, about 16p each) | 4 a month | 8 a month |
 | Listings written (about 3p each) | 10 a month | 75 a month |
 | Buyer replies (well under 1p each) | 30 a month | 300 a month |
-| Spreadsheet, imports, eBay, Vinted and StockX sync, backups | Unlimited | Unlimited |
+| Tracker, imports, eBay, Vinted and StockX sync, backups | Unlimited | Unlimited |
 | Worst-case Claude cost | about £0.95 | about £3.60 |
 | Stripe fee | none | about 30p |
 | **Worst-case margin** | (costs you up to £0.95) | **about £3.09** (meets the £2.50 target) |
@@ -270,9 +307,9 @@ Notes:
 - [x] Stage 1: Plan
 - [x] Stage 2: Foundations
 - [ ] Stage 3: Accounts and private data (only you). Confirmed on the preview; tick once sign-in works on the live app
-- [ ] Stage 4: Built-in tracker, one-off import, export, Download backup (only you)
+- [ ] Stage 4: Built-in tracker and new look (first half: dashboard and orders; second half: inventory, sales, expenses, weekly check from the tracker)
 - [ ] Stage 5: eBay sync for your account
-- [ ] Stage 6: Vinted sync via email forwarding on your own domain, plus manual entry
+- [ ] Stage 6: Vinted sales and retailer order emails via email forwarding on your own domain, plus manual entry
 - [ ] Stage 7: Claude usage limits
 - [ ] Stage 8: Privacy policy, terms, ICO, own-domain emails, automatic weekly backup (beta can start after this)
 - [ ] Stage 9: StockX CSV import
@@ -280,3 +317,6 @@ Notes:
 - [ ] Stage 11: Gmail connection (optional)
 - [ ] Stage 12: Stripe paid plan
 - [ ] Stage 13: Public launch
+- [ ] Stage 14 (optional): orders from your bot's Discord webhook
+- [ ] Stage 15 (optional): "Share a win" image
+- [ ] Stage 16 (optional): "Ask the assistant"
