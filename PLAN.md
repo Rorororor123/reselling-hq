@@ -121,6 +121,19 @@ Built in two halves, with a preview after each:
 1. First half: this plan update, design files moved into `design/`, the database file, the dashboard maths, the new look, the Dashboard and the Orders screen.
 2. Second half: Inventory, Sales, Expenses, the full quick add, Settings changes, the weekly check reading from the tracker, then the optional extras if they stay small.
 
+First half built (19 October 2026), waiting for your check on the preview:
+- **What was built:**
+  - `supabase/migrations/002_tracker.sql`: orders, items and expenses tables, plus "move into stock" done in one step.
+  - `js/core.js`: the dashboard maths.
+  - `js/tracker.js`: the Dashboard, the Orders screen and the order form.
+  - The new look in `css/styles.css`, and new purple icons.
+  - On phones: a bottom tab bar, a More menu and a + button.
+  - The weekly check is now its own screen.
+- **Tests (all passing):**
+  - 35 new unit tests, including the security rules for the new tables run in a test database.
+  - 12 new browser tests (adding, moving and stocking orders; dashboard figures, goal, chart and Customise; the setup message).
+- **Your one setup step:** run `002_tracker.sql` in Supabase.
+
 Done when: you can add orders, move them into stock, sell items and log expenses on your phone; the dashboard and weekly check show the right numbers from the app's own data; and another account can't see any of it (proven by an automated test).
 
 ### Stage 5: eBay sync (your account first)
